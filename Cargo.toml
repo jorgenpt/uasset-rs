@@ -1,0 +1,13 @@
+[package]
+name = "uasset"
+description = "Parsing of Unreal Engine asset files (uassets)"
+keywords = ["unreal", "ue4", "uasset"]
+categories = ["game-development", "parser-implementations"]
+authors = ["Jørgen P. Tjernø <jorgen@tjer.no>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/jorgenpt/uasset-rs/"
+repository = "https://github.com/jorgenpt/uasset-rs/"
+version = "0.1.0"
+
+[dependencies]
