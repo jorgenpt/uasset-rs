@@ -5,11 +5,12 @@ mod versions;
 use binread::BinReaderExt;
 use error::Result;
 use std::io::{Read, Seek, SeekFrom};
-use types::{PackageFlags, UnrealString};
+use types::{PackageFlags, UnrealArray, UnrealString};
 use versions::UnrealEngineObjectUE4Version;
 
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
-// This is specific to the ECustomVersionSerializationFormat::Optimized used in more recent files
+/// Size of FCustomVersion, when serializing with ECustomVersionSerializationFormat::Optimized which is the case in
+/// all the file versions we support.
 const CUSTOM_VERSION_SIZE: i64 = 20;
 
 #[derive(Debug)]
@@ -46,10 +47,7 @@ impl PackageFileSummary {
         // We need a version
         assert!(file_version_ue4 != 0 || file_version_licensee_ue4 != 0);
 
-        let num_custom_versions: i32 = reader.read_le()?;
-        reader.seek(SeekFrom::Current(
-            num_custom_versions as i64 * CUSTOM_VERSION_SIZE,
-        ))?;
+        let _custom_versions = UnrealArray::skip(&mut reader, CUSTOM_VERSION_SIZE)?;
 
         let total_header_size = reader.read_le()?;
 

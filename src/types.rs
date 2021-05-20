@@ -26,6 +26,21 @@ impl UnrealString {
     }
 }
 
+pub struct UnrealArray {}
+
+impl UnrealArray {
+    pub fn skip<R>(reader: &mut R, element_size: i64) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        let num_elements: i32 = reader.read_le()?;
+
+        reader.seek(SeekFrom::Current(element_size * num_elements as i64))?;
+
+        Ok(())
+    }
+}
+
 /// enum EPackageFlags in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
 #[allow(dead_code)]
 #[derive(Debug)]
