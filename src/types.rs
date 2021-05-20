@@ -41,6 +41,23 @@ impl UnrealArray {
     }
 }
 
+/// Size of FEngineVersionBase
+const ENGINE_VERSION_BASE_SIZE: i64 = 10;
+
+pub struct UnrealEngineVersion {}
+
+impl UnrealEngineVersion {
+    pub fn skip<R>(mut reader: &mut R) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Current(ENGINE_VERSION_BASE_SIZE))?;
+        // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
+        let _engine_version_branch_name = UnrealString::skip(&mut reader)?;
+        Ok(())
+    }
+}
+
 /// enum EPackageFlags in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
 #[allow(dead_code)]
 #[derive(Debug)]
