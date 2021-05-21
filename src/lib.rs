@@ -28,22 +28,22 @@ pub struct PackageFileSummary {
     pub total_header_size: i32,
     pub package_flags: u32, // TODO: PackageFlags
     pub name_count: i32,
-    pub name_offset: i32,
+    name_offset: i32,
     pub gatherable_text_data_count: i32,
-    pub gatherable_text_data_offset: i32,
+    gatherable_text_data_offset: i32,
     pub export_count: i32,
-    pub export_offset: i32,
+    export_offset: i32,
     pub import_count: i32,
-    pub import_offset: i32,
-    pub depends_offset: i32,
+    import_offset: i32,
+    depends_offset: i32,
     pub string_reference_count: i32,
-    pub string_reference_offset: i32,
-    pub searchable_names_offset: Option<i32>,
+    string_reference_offset: i32,
+    searchable_names_offset: Option<i32>,
     pub thumbnail_table_offset: i32,
     pub compression_flags: u32,
     pub package_source: u32,
     pub texture_allocations: Option<i32>,
-    pub asset_data_offset: i32,
+    asset_data_offset: i32,
 }
 
 impl PackageFileSummary {
@@ -197,5 +197,33 @@ impl PackageFileSummary {
             texture_allocations,
             asset_data_offset,
         })
+    }
+
+    pub fn get_names<R>(&self, mut reader: R) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(self.name_offset as u64))?;
+        if self.file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
+            for _ in 0..self.name_count {
+                let _name = UnrealString::skip(&mut reader)?;
+                let _name_hash = reader.read_le()?;
+            }
+        } else {
+            for _ in 0..self.name_count {
+                let _name = UnrealString::skip(&mut reader)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn get_imports<R>(&self, mut reader: R) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(self.import_offset as u64))?;
+
+        Ok(())
     }
 }
