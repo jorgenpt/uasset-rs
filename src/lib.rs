@@ -5,8 +5,10 @@ mod versions;
 use binread::BinReaderExt;
 use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
-use types::{PackageFlags, UnrealArray, UnrealEngineVersion, UnrealString};
-use versions::UnrealEngineObjectUE4Version;
+use types::{UnrealArray, UnrealEngineVersion, UnrealString};
+
+pub use types::PackageFlags;
+pub use versions::ObjectVersion;
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
@@ -23,27 +25,27 @@ const COMPRESSED_CHUNK_SIZE: i64 = 16;
 /// The header of any UPackage asset
 #[derive(Debug)]
 pub struct PackageFileSummary {
-    file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
-    file_version_licensee_ue4: i32,
-    total_header_size: i32,
-    package_flags: u32, // TODO: PackageFlags
-    name_count: i32,
-    name_offset: i32,
-    gatherable_text_data_count: i32,
-    gatherable_text_data_offset: i32,
-    export_count: i32,
-    export_offset: i32,
-    import_count: i32,
-    import_offset: i32,
-    depends_offset: i32,
-    string_reference_count: i32,
-    string_reference_offset: i32,
-    searchable_names_offset: Option<i32>,
-    thumbnail_table_offset: i32,
-    compression_flags: u32,
-    package_source: u32,
-    texture_allocations: Option<i32>,
-    asset_data_offset: i32,
+    pub file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
+    pub file_version_licensee_ue4: i32,
+    pub total_header_size: i32,
+    pub package_flags: u32, // TODO: PackageFlags
+    pub name_count: i32,
+    pub name_offset: i32,
+    pub gatherable_text_data_count: i32,
+    pub gatherable_text_data_offset: i32,
+    pub export_count: i32,
+    pub export_offset: i32,
+    pub import_count: i32,
+    pub import_offset: i32,
+    pub depends_offset: i32,
+    pub string_reference_count: i32,
+    pub string_reference_offset: i32,
+    pub searchable_names_offset: Option<i32>,
+    pub thumbnail_table_offset: i32,
+    pub compression_flags: u32,
+    pub package_source: u32,
+    pub texture_allocations: Option<i32>,
+    pub asset_data_offset: i32,
 }
 
 impl PackageFileSummary {
@@ -82,16 +84,16 @@ impl PackageFileSummary {
         let name_count = reader.read_le()?;
         let name_offset = reader.read_le()?;
 
-        let supports_localization_id = file_version_ue4
-            >= UnrealEngineObjectUE4Version::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
+        let supports_localization_id =
+            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
         if supports_localization_id {
             if has_editor_only_data {
                 let _localization_id = UnrealString::skip(&mut reader)?;
             }
         }
 
-        let has_gatherable_text_data = file_version_ue4
-            >= UnrealEngineObjectUE4Version::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
+        let has_gatherable_text_data =
+            file_version_ue4 >= ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
         let (gatherable_text_data_count, gatherable_text_data_offset) = if has_gatherable_text_data
         {
             (reader.read_le()?, reader.read_le()?)
@@ -105,8 +107,8 @@ impl PackageFileSummary {
         let import_offset = reader.read_le()?;
         let depends_offset = reader.read_le()?;
 
-        let has_string_asset_references_map = file_version_ue4
-            >= UnrealEngineObjectUE4Version::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP as i32;
+        let has_string_asset_references_map =
+            file_version_ue4 >= ObjectVersion::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP as i32;
         let (string_reference_count, string_reference_offset) = if has_string_asset_references_map {
             (reader.read_le()?, reader.read_le()?)
         } else {
@@ -114,7 +116,7 @@ impl PackageFileSummary {
         };
 
         let has_searchable_names =
-            file_version_ue4 >= UnrealEngineObjectUE4Version::VER_UE4_ADDED_SEARCHABLE_NAMES as i32;
+            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES as i32;
         let searchable_names_offset = if has_searchable_names {
             Some(reader.read_le()?)
         } else {
@@ -125,9 +127,9 @@ impl PackageFileSummary {
 
         let _guid = reader.seek(SeekFrom::Current(GUID_SIZE))?;
         let supports_package_owner =
-            file_version_ue4 >= UnrealEngineObjectUE4Version::VER_UE4_ADDED_PACKAGE_OWNER as i32;
+            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER as i32;
         let supports_non_outer_package_import = file_version_ue4
-            >= UnrealEngineObjectUE4Version::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
+            >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
         if supports_package_owner && has_editor_only_data {
             let _persistent_guid = reader.seek(SeekFrom::Current(GUID_SIZE))?;
             if supports_non_outer_package_import {
@@ -138,7 +140,7 @@ impl PackageFileSummary {
         let _generations = UnrealArray::skip(&mut reader, GENERATION_INFO_SIZE)?;
 
         let has_engine_version_object =
-            file_version_ue4 >= UnrealEngineObjectUE4Version::VER_UE4_ENGINE_VERSION_OBJECT as i32;
+            file_version_ue4 >= ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT as i32;
         if has_engine_version_object {
             let _saved_by_engine_version = UnrealEngineVersion::skip(&mut reader)?;
         } else {
@@ -147,8 +149,7 @@ impl PackageFileSummary {
         }
 
         let has_compatible_with_engine_version = file_version_ue4
-            >= UnrealEngineObjectUE4Version::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION
-                as i32;
+            >= ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION as i32;
         if has_compatible_with_engine_version {
             let _compatible_with_engine_version = UnrealEngineVersion::skip(&mut reader)?;
         }

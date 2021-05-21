@@ -1,7 +1,7 @@
 /// enum EUnrealEngineObjectUE4Version from Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
-pub enum UnrealEngineObjectUE4Version {
+pub enum ObjectVersion {
     VER_UE4_OLDEST_LOADABLE_PACKAGE = 214,
     VER_UE4_BLUEPRINT_VARS_NOT_READ_ONLY = 215,
     VER_UE4_STATIC_MESH_STORE_NAV_COLLISION = 216,
