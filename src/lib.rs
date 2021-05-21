@@ -126,10 +126,10 @@ impl PackageFileSummary {
         let _guid = reader.seek(SeekFrom::Current(GUID_SIZE))?;
         let supports_package_owner =
             file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER as i32;
-        let supports_non_outer_package_import = file_version_ue4
-            >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
         if supports_package_owner && has_editor_only_data {
             let _persistent_guid = reader.seek(SeekFrom::Current(GUID_SIZE))?;
+            let supports_non_outer_package_import =
+                file_version_ue4 < ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
             if supports_non_outer_package_import {
                 let _owner_persistent_guid = reader.seek(SeekFrom::Current(GUID_SIZE))?;
             }
