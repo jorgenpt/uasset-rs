@@ -14,3 +14,7 @@ version = "0.1.0"
 binread = "2.1.1"
 structopt = "0.3"
 thiserror = "^1"
+
+[dev-dependencies]
+rstest = "0.10.0"
+rstest_reuse = "0.1.3"
