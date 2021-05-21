@@ -1,16 +1,18 @@
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 use uasset::PackageFileSummary;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "uassetdump", about = "A program to dump uasset data")]
+#[structopt(name = "uasset", about = "A program to dump uasset data")]
 struct CommandOptions {
-    file: String,
+    paths: Vec<PathBuf>,
 }
 
 fn main() {
     let options = CommandOptions::from_args();
 
-    let file = File::open(options.file).unwrap();
-    println!("{:#?}", PackageFileSummary::new(file));
+    for path in options.paths {
+        let file = File::open(path).unwrap();
+        println!("{:#?}", PackageFileSummary::new(file));
+    }
 }

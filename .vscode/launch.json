@@ -39,7 +39,8 @@
                 }
             },
             "args": [
-                "assets/UE410/SimpleRefs/SimpleRefsRoot.uasset"
+                "assets/UE410/SimpleRefs/SimpleRefsRoot.uasset",
+                "assets/UE426/SimpleRefs/SimpleRefsRoot.uasset"
             ],
             "cwd": "${workspaceFolder}"
         },
