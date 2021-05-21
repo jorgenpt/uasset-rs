@@ -3,6 +3,9 @@ use std::io::{Read, Seek, SeekFrom};
 
 use crate::error::Result;
 
+mod versions;
+pub use versions::ObjectVersion;
+
 pub struct UnrealString {}
 
 const UCS2_WIDTH: i64 = 2;

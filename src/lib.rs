@@ -1,14 +1,12 @@
 mod error;
 mod types;
-mod versions;
 
 use binread::BinReaderExt;
 use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 use types::{UnrealArray, UnrealEngineVersion, UnrealString};
 
-pub use types::PackageFlags;
-pub use versions::ObjectVersion;
+pub use types::{ObjectVersion, PackageFlags};
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
