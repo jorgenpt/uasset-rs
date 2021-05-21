@@ -4,6 +4,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("data is not a uasset")]
+    InvalidFile,
+    #[error("asset has unsupported legacy version value {0:?}")]
+    UnsupportedVersion(i32),
+    #[error("asset saved without asset version information")]
+    UnversionedAsset,
     #[error("failed to parse data: {0:?}")]
     ParseError(binread::Error),
     #[error("failed to seek in stream: {0:?}")]

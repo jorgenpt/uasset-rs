@@ -3,7 +3,7 @@ mod types;
 mod versions;
 
 use binread::BinReaderExt;
-use error::Result;
+use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 use types::{PackageFlags, UnrealArray, UnrealEngineVersion, UnrealString};
 use versions::UnrealEngineObjectUE4Version;
@@ -50,16 +50,22 @@ impl PackageFileSummary {
         R: Seek + Read,
     {
         let magic: u32 = reader.read_le()?;
-        assert!(magic == PACKAGE_FILE_MAGIC);
+        if magic != PACKAGE_FILE_MAGIC {
+            return Err(Error::InvalidFile);
+        }
+
         let legacy_version: i32 = reader.read_le()?;
-        assert!(legacy_version == -6 || legacy_version == -7);
+        if legacy_version != -6 && legacy_version != -7 {
+            return Err(Error::UnsupportedVersion(legacy_version));
+        }
+
         let _legacy_ue3_version: i32 = reader.read_le()?;
 
         let file_version_ue4 = reader.read_le()?;
         let file_version_licensee_ue4 = reader.read_le()?;
-
-        // We need a version
-        assert!(file_version_ue4 != 0 || file_version_licensee_ue4 != 0);
+        if file_version_ue4 == 0 && file_version_licensee_ue4 == 0 {
+            return Err(Error::UnversionedAsset);
+        }
 
         let _custom_versions = UnrealArray::skip(&mut reader, CUSTOM_VERSION_SIZE)?;
 
