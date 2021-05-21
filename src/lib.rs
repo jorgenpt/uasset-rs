@@ -8,6 +8,7 @@ use std::io::{Read, Seek, SeekFrom};
 use types::{PackageFlags, UnrealArray, UnrealEngineVersion, UnrealString};
 use versions::UnrealEngineObjectUE4Version;
 
+/// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 /// Size of FCustomVersion, when serializing with ECustomVersionSerializationFormat::Optimized which is the case in
 /// all the file versions we support.
@@ -19,6 +20,7 @@ const GENERATION_INFO_SIZE: i64 = 8;
 /// Size of FCompressedChunk
 const COMPRESSED_CHUNK_SIZE: i64 = 16;
 
+/// The header of any UPackage asset
 #[derive(Debug)]
 pub struct PackageFileSummary {
     file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
@@ -45,6 +47,7 @@ pub struct PackageFileSummary {
 }
 
 impl PackageFileSummary {
+    /// Parse a PackageFileSummary from the given reader, assuming a little endian uasset
     pub fn new<R>(mut reader: R) -> Result<Self>
     where
         R: Seek + Read,
