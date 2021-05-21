@@ -6,13 +6,61 @@ use crate::error::Result;
 mod versions;
 pub use versions::ObjectVersion;
 
+pub trait IoDeferrable<D>
+where
+    Self: Sized,
+{
+    fn seek_past<R>(reader: &mut R, details: &D) -> Result<()>
+    where
+        R: Seek + Read;
+
+    fn parse<R>(reader: &mut R, details: &D) -> Result<Self>
+    where
+        R: Seek + Read;
+}
+
+pub enum IoDeferred<D, T>
+where
+    T: IoDeferrable<D>,
+{
+    Pending(D),
+    Present(T),
+}
+
+pub struct DeferredDetailsSingle {
+    pub offset: u64,
+}
+
+pub struct DeferredDetailsArray {
+    pub offset: u64,
+    pub count: u64,
+}
+
 pub struct UnrealString {}
 
 const UCS2_WIDTH: i64 = 2;
 const ASCII_WIDTH: i64 = 1;
 
-impl UnrealString {
-    pub fn skip<R>(reader: &mut R) -> Result<()>
+impl IoDeferrable<DeferredDetailsSingle> for UnrealString {
+    fn seek_past<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(details.offset));
+
+        let length: i32 = reader.read_le()?;
+        let (length, character_width) = if length < 0 {
+            (-length, UCS2_WIDTH)
+        } else {
+            (length, ASCII_WIDTH)
+        };
+
+        reader.seek(SeekFrom::Current(length as i64 * character_width))?;
+
+        Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<Self>
     where
         R: Seek + Read,
     {
@@ -25,7 +73,7 @@ impl UnrealString {
 
         reader.seek(SeekFrom::Current(length as i64 * character_width))?;
 
-        Ok(())
+        Ok(UnrealString {})
     }
 }
 
@@ -45,19 +93,29 @@ impl UnrealArray {
 }
 
 /// Size of FEngineVersionBase
-const ENGINE_VERSION_BASE_SIZE: i64 = 10;
+const ENGINE_VERSION_BASE_SIZE: u64 = 10;
 
 pub struct UnrealEngineVersion {}
 
-impl UnrealEngineVersion {
-    pub fn skip<R>(mut reader: &mut R) -> Result<()>
+impl IoDeferrable<DeferredDetailsSingle> for UnrealEngineVersion {
+    fn seek_past<R>(mut reader: &mut R, details: &DeferredDetailsSingle) -> Result<()>
     where
         R: Seek + Read,
     {
-        reader.seek(SeekFrom::Current(ENGINE_VERSION_BASE_SIZE))?;
         // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
-        let _engine_version_branch_name = UnrealString::skip(&mut reader)?;
+        let _engine_version_branch_name = UnrealString::seek_past(
+            &mut reader,
+            &DeferredDetailsSingle {
+                offset: details.offset + ENGINE_VERSION_BASE_SIZE,
+            },
+        )?;
         Ok(())
+    }
+    fn parse<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Ok(UnrealEngineVersion {})
     }
 }
 
