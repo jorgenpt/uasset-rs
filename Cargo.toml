@@ -12,6 +12,7 @@ version = "0.1.0"
 
 [dependencies]
 binread = "2.1.1"
+bit_field = "0.10.1"
 structopt = "0.3"
 thiserror = "^1"
 
