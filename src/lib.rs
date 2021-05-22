@@ -5,7 +5,7 @@ use binread::BinReaderExt;
 use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 use types::{
-    ArrayStreamInfo, IoDeferrable, IoDeferred, SingleItemStreamInfo, UnrealArray,
+    ArrayStreamInfo, IoDeferred, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
     UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
     UnrealString,
 };
