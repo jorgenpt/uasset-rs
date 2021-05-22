@@ -6,89 +6,208 @@ use crate::error::Result;
 mod versions;
 pub use versions::ObjectVersion;
 
-pub trait IoDeferrable<D>
+pub trait IoDeferrable
 where
     Self: Sized,
 {
-    fn seek_past<R>(reader: &mut R, details: &D) -> Result<()>
+    type StreamInfoType;
+
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read;
 
-    fn parse<R>(reader: &mut R, details: &D) -> Result<Self>
+    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
     where
         R: Seek + Read;
 }
 
-pub enum IoDeferred<D, T>
+#[derive(Debug)]
+pub enum IoDeferred<T>
 where
-    T: IoDeferrable<D>,
+    T: IoDeferrable,
 {
-    Pending(D),
+    Pending(T::StreamInfoType),
     Present(T),
 }
 
-pub struct DeferredDetailsSingle {
+#[derive(Debug)]
+pub struct SingleItemStreamInfo {
     pub offset: u64,
 }
 
-pub struct DeferredDetailsArray {
+impl SingleItemStreamInfo {
+    pub fn from_stream<R>(reader: &mut R) -> Result<Self>
+    where
+        R: Seek,
+    {
+        Ok(SingleItemStreamInfo {
+            offset: reader.stream_position()?,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct ArrayStreamInfo {
     pub offset: u64,
     pub count: u64,
 }
 
 pub struct UnrealString {}
 
-const UCS2_WIDTH: i64 = 2;
-const ASCII_WIDTH: i64 = 1;
-
-impl IoDeferrable<DeferredDetailsSingle> for UnrealString {
-    fn seek_past<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<()>
+impl UnrealString {
+    pub fn skip_in_stream<R>(reader: &mut R) -> Result<()>
     where
         R: Seek + Read,
     {
-        reader.seek(SeekFrom::Start(details.offset));
-
-        let length: i32 = reader.read_le()?;
-        let (length, character_width) = if length < 0 {
-            (-length, UCS2_WIDTH)
-        } else {
-            (length, ASCII_WIDTH)
-        };
-
-        reader.seek(SeekFrom::Current(length as i64 * character_width))?;
-
-        Ok(())
-    }
-
-    fn parse<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<Self>
-    where
-        R: Seek + Read,
-    {
-        let length: i32 = reader.read_le()?;
-        let (length, character_width) = if length < 0 {
-            (-length, UCS2_WIDTH)
-        } else {
-            (length, ASCII_WIDTH)
-        };
-
-        reader.seek(SeekFrom::Current(length as i64 * character_width))?;
-
-        Ok(UnrealString {})
+        let stream_info = SingleItemStreamInfo::from_stream(reader)?;
+        UnrealString::seek_past(reader, &stream_info)
     }
 }
 
-pub struct UnrealArray {}
+const UCS2_WIDTH: i64 = 2;
+const ASCII_WIDTH: i64 = 1;
 
-impl UnrealArray {
-    pub fn skip<R>(reader: &mut R, element_size: i64) -> Result<()>
+impl IoDeferrable for UnrealString {
+    type StreamInfoType = SingleItemStreamInfo;
+
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
-        let num_elements: i32 = reader.read_le()?;
+        reader.seek(SeekFrom::Start(stream_info.offset))?;
 
-        reader.seek(SeekFrom::Current(element_size * num_elements as i64))?;
+        let length: i32 = reader.read_le()?;
+        let (length, character_width) = if length < 0 {
+            (-length, UCS2_WIDTH)
+        } else {
+            (length, ASCII_WIDTH)
+        };
+
+        reader.seek(SeekFrom::Current(length as i64 * character_width))?;
 
         Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Self::seek_past(reader, stream_info)?;
+
+        Ok(Self {})
+    }
+}
+#[derive(Debug)]
+pub struct UnrealArray<ElementType>
+where
+    ElementType: IoDeferrable,
+{
+    elements: Vec<ElementType>,
+}
+
+impl<ElementType> IoDeferrable for UnrealArray<ElementType>
+where
+    ElementType: IoDeferrable<StreamInfoType = SingleItemStreamInfo>,
+{
+    type StreamInfoType = ArrayStreamInfo;
+
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset))?;
+
+        for _ in 0..stream_info.count {
+            let element_stream_info = SingleItemStreamInfo {
+                offset: reader.stream_position()?,
+            };
+            ElementType::seek_past(reader, &element_stream_info)?;
+        }
+
+        Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Self::seek_past(reader, stream_info)?;
+        Ok(UnrealArray {
+            elements: Vec::new(),
+        })
+    }
+}
+
+/// Size of FCustomVersion, when serializing with ECustomVersionSerializationFormat::Optimized which is the case in
+/// all the file versions we support.
+const CUSTOM_VERSION_SIZE: u64 = 20;
+pub struct UnrealCustomVersion {}
+
+impl IoDeferrable for UnrealCustomVersion {
+    type StreamInfoType = SingleItemStreamInfo;
+
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset + CUSTOM_VERSION_SIZE))?;
+        Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, details: &Self::StreamInfoType) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Self::seek_past(reader, details)?;
+        Ok(Self {})
+    }
+}
+
+/// Size of FGenerationInfo
+const GENERATION_INFO_SIZE: u64 = 8;
+pub struct UnrealGenerationInfo {}
+
+impl IoDeferrable for UnrealGenerationInfo {
+    type StreamInfoType = SingleItemStreamInfo;
+
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset + GENERATION_INFO_SIZE))?;
+        Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, details: &Self::StreamInfoType) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Self::seek_past(reader, details)?;
+        Ok(Self {})
+    }
+}
+
+/// Size of FCompressedChunk
+const COMPRESSED_CHUNK_SIZE: u64 = 16;
+pub struct UnrealCompressedChunk {}
+
+impl IoDeferrable for UnrealCompressedChunk {
+    type StreamInfoType = SingleItemStreamInfo;
+
+    fn seek_past<R>(mut reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset + COMPRESSED_CHUNK_SIZE))?;
+        Ok(())
+    }
+
+    fn parse<R>(reader: &mut R, details: &Self::StreamInfoType) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        Self::seek_past(reader, details)?;
+        Ok(Self {})
     }
 }
 
@@ -97,25 +216,29 @@ const ENGINE_VERSION_BASE_SIZE: u64 = 10;
 
 pub struct UnrealEngineVersion {}
 
-impl IoDeferrable<DeferredDetailsSingle> for UnrealEngineVersion {
-    fn seek_past<R>(mut reader: &mut R, details: &DeferredDetailsSingle) -> Result<()>
+impl IoDeferrable for UnrealEngineVersion {
+    type StreamInfoType = SingleItemStreamInfo;
+
+    fn seek_past<R>(mut reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
         // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
         let _engine_version_branch_name = UnrealString::seek_past(
             &mut reader,
-            &DeferredDetailsSingle {
-                offset: details.offset + ENGINE_VERSION_BASE_SIZE,
+            &SingleItemStreamInfo {
+                offset: stream_info.offset + ENGINE_VERSION_BASE_SIZE,
             },
         )?;
         Ok(())
     }
-    fn parse<R>(reader: &mut R, details: &DeferredDetailsSingle) -> Result<Self>
+
+    fn parse<R>(reader: &mut R, details: &Self::StreamInfoType) -> Result<Self>
     where
         R: Seek + Read,
     {
-        Ok(UnrealEngineVersion {})
+        Self::seek_past(reader, details)?;
+        Ok(Self {})
     }
 }
 

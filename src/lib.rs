@@ -4,21 +4,18 @@ mod types;
 use binread::BinReaderExt;
 use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
-use types::{UnrealArray, UnrealEngineVersion, UnrealString};
+use types::{
+    ArrayStreamInfo, IoDeferrable, IoDeferred, SingleItemStreamInfo, UnrealArray,
+    UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
+    UnrealString,
+};
 
 pub use types::{ObjectVersion, PackageFlags};
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
-/// Size of FCustomVersion, when serializing with ECustomVersionSerializationFormat::Optimized which is the case in
-/// all the file versions we support.
-const CUSTOM_VERSION_SIZE: i64 = 20;
 /// Size of FGuid
 const GUID_SIZE: i64 = 16;
-/// Size of FGenerationInfo
-const GENERATION_INFO_SIZE: i64 = 8;
-/// Size of FCompressedChunk
-const COMPRESSED_CHUNK_SIZE: i64 = 16;
 
 /// The header of any UPackage asset
 #[derive(Debug)]
@@ -70,11 +67,19 @@ impl PackageFileSummary {
             return Err(Error::UnversionedAsset);
         }
 
-        let _custom_versions = UnrealArray::skip(&mut reader, CUSTOM_VERSION_SIZE)?;
+        let num_custom_versions: i32 = reader.read_le()?;
+        let custom_versions_stream_info = ArrayStreamInfo {
+            offset: reader.stream_position()?,
+            count: num_custom_versions as u64,
+        };
+        let _custom_versions = UnrealArray::<UnrealCustomVersion>::seek_past(
+            &mut reader,
+            &custom_versions_stream_info,
+        )?;
 
         let total_header_size = reader.read_le()?;
 
-        let _folder_name = UnrealString::skip(&mut reader)?;
+        let _folder_name = UnrealString::skip_in_stream(&mut reader)?;
 
         let package_flags = reader.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
@@ -86,7 +91,7 @@ impl PackageFileSummary {
             file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
         if supports_localization_id {
             if has_editor_only_data {
-                let _localization_id = UnrealString::skip(&mut reader)?;
+                let _localization_id = UnrealString::skip_in_stream(&mut reader)?;
             }
         }
 
@@ -135,12 +140,19 @@ impl PackageFileSummary {
             }
         }
 
-        let _generations = UnrealArray::skip(&mut reader, GENERATION_INFO_SIZE)?;
+        let num_generations: i32 = reader.read_le()?;
+        let generations_stream_info = ArrayStreamInfo {
+            offset: reader.stream_position()?,
+            count: num_generations as u64,
+        };
+        let _generations =
+            UnrealArray::<UnrealGenerationInfo>::seek_past(&mut reader, &generations_stream_info)?;
 
         let has_engine_version_object =
             file_version_ue4 >= ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT as i32;
         if has_engine_version_object {
-            let _saved_by_engine_version = UnrealEngineVersion::skip(&mut reader)?;
+            let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
+            let _saved_by_engine_version = UnrealEngineVersion::seek_past(&mut reader, details)?;
         } else {
             let _engine_changelist: u32 = reader.read_le()?;
             // 4.26 converts this using FEngineVersion::Set(4, 0, 0, EngineChangelist, TEXT(""));
@@ -149,13 +161,23 @@ impl PackageFileSummary {
         let has_compatible_with_engine_version = file_version_ue4
             >= ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION as i32;
         if has_compatible_with_engine_version {
-            let _compatible_with_engine_version = UnrealEngineVersion::skip(&mut reader)?;
+            let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
+            let _compatible_with_engine_version =
+                UnrealEngineVersion::seek_past(&mut reader, details)?;
         }
 
         let compression_flags = reader.read_le()?;
 
         // The engine will refuse to load any package with compressed chunks, but it doesn't hurt for us to just skip past them.
-        let _compressed_chunks = UnrealArray::skip(&mut reader, COMPRESSED_CHUNK_SIZE);
+        let num_compressed_chunks: i32 = reader.read_le()?;
+        let compressed_chunk_stream_info = ArrayStreamInfo {
+            offset: reader.stream_position()?,
+            count: num_compressed_chunks as u64,
+        };
+        let _compressed_chunks = UnrealArray::<UnrealCompressedChunk>::seek_past(
+            &mut reader,
+            &compressed_chunk_stream_info,
+        )?;
 
         // This is a random number in assets created by the shipping build of the editor, and a crc32 of the uppercased filename
         // otherwise. Weird. Used to determine if an asset was made "by a modder or by Epic (or licensee)".
@@ -163,7 +185,7 @@ impl PackageFileSummary {
 
         let num_additional_packages_to_cook: i32 = reader.read_le()?;
         for _ in 0..num_additional_packages_to_cook {
-            let _additional_package_to_cook = UnrealString::skip(&mut reader)?;
+            let _additional_package_to_cook = UnrealString::skip_in_stream(&mut reader)?;
         }
 
         let texture_allocations = if legacy_version > -7 {
@@ -206,12 +228,12 @@ impl PackageFileSummary {
         reader.seek(SeekFrom::Start(self.name_offset as u64))?;
         if self.file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
             for _ in 0..self.name_count {
-                let _name = UnrealString::skip(&mut reader)?;
+                let _name = UnrealString::skip_in_stream(&mut reader)?;
                 let _name_hash = reader.read_le()?;
             }
         } else {
             for _ in 0..self.name_count {
-                let _name = UnrealString::skip(&mut reader)?;
+                let _name = UnrealString::skip_in_stream(&mut reader)?;
             }
         }
 
