@@ -39,6 +39,7 @@ pub struct PackageFileSummary {
     pub thumbnail_table_offset: i32,
     pub compression_flags: u32,
     pub package_source: u32,
+    pub additional_packages_to_cook: IoDeferred<UnrealArray<UnrealString>>,
     pub texture_allocations: Option<i32>,
     asset_data_offset: i32,
 }
@@ -184,9 +185,14 @@ impl PackageFileSummary {
         let package_source = reader.read_le()?;
 
         let num_additional_packages_to_cook: i32 = reader.read_le()?;
-        for _ in 0..num_additional_packages_to_cook {
-            let _additional_package_to_cook = UnrealString::skip_in_stream(&mut reader)?;
-        }
+        let additional_packages_to_cook_stream_info = ArrayStreamInfo {
+            offset: reader.stream_position()?,
+            count: num_additional_packages_to_cook as u64,
+        };
+        let additional_packages_to_cook = IoDeferred::Present(UnrealArray::<UnrealString>::parse(
+            &mut reader,
+            &additional_packages_to_cook_stream_info,
+        )?);
 
         let texture_allocations = if legacy_version > -7 {
             Some(reader.read_le()?)
@@ -216,6 +222,7 @@ impl PackageFileSummary {
             thumbnail_table_offset,
             compression_flags,
             package_source,
+            additional_packages_to_cook,
             texture_allocations,
             asset_data_offset,
         })
