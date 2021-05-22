@@ -247,7 +247,7 @@ pub struct UnrealCompressedChunk {}
 impl IoDeferrable for UnrealCompressedChunk {
     type StreamInfoType = SingleItemStreamInfo;
 
-    fn seek_past<R>(mut reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -272,13 +272,13 @@ pub struct UnrealEngineVersion {}
 impl IoDeferrable for UnrealEngineVersion {
     type StreamInfoType = SingleItemStreamInfo;
 
-    fn seek_past<R>(mut reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
         // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
         let _engine_version_branch_name = UnrealString::seek_past(
-            &mut reader,
+            reader,
             &SingleItemStreamInfo {
                 offset: stream_info.offset + ENGINE_VERSION_BASE_SIZE,
             },
