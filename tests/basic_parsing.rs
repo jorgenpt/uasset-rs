@@ -23,3 +23,27 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
     );
 }
 
+#[apply(all_versions)]
+fn upgrading_asset(#[case] version_info: UnrealVersionInfo) {
+    if version_info.next_version.is_none() {
+        return;
+    }
+
+    let mut old_simple_refs_root = version_info.version.get_asset_base_path();
+    old_simple_refs_root.push("SimpleRefs");
+    old_simple_refs_root.push("SimpleRefsRoot.uasset");
+    let old_package_file_summary =
+        PackageFileSummary::new(File::open(old_simple_refs_root).unwrap()).unwrap();
+
+    let mut new_simple_refs_root = version_info.next_version.unwrap().get_asset_base_path();
+    new_simple_refs_root.push("SimpleRefs");
+    new_simple_refs_root.push("SimpleRefsRoot.uasset");
+    let new_package_file_summary =
+        PackageFileSummary::new(File::open(new_simple_refs_root).unwrap()).unwrap();
+
+    assert!(new_package_file_summary.file_version_ue4 >= old_package_file_summary.file_version_ue4, "new_package_file_summary.file_version_ue4 = {}, old_package_file_summary.file_version_ue4 = {}", new_package_file_summary.file_version_ue4, old_package_file_summary.file_version_ue4);
+    assert_eq!(
+        new_package_file_summary.package_source,
+        old_package_file_summary.package_source
+    );
+}
