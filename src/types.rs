@@ -30,15 +30,43 @@ pub trait Parseable: Deferrable
 where
     Self: Sized,
 {
-    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
     where
         R: Seek + Read;
+
+    fn parse_inline<R>(reader: &mut R) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        let stream_info = Self::StreamInfoType::from_current_position(reader)?;
+        Ok(Self::parse_with_info(reader, &stream_info)?)
+    }
+
+    fn parse_indirect<R>(reader: &mut R) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        let stream_info = Self::StreamInfoType::from_indirect_reference(reader)?;
+        let current_position = reader.stream_position()?;
+        let obj = Self::parse_with_info(reader, &stream_info)?;
+        reader.seek(SeekFrom::Start(current_position))?;
+        Ok(obj)
+    }
 }
 
 pub trait Skippable: Deferrable {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read;
+
+    fn seek_past<R>(reader: &mut R) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        let stream_info = Self::StreamInfoType::from_current_position(reader)?;
+        Self::seek_past_with_info(reader, &stream_info)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -128,7 +156,7 @@ impl UnrealString {
         R: Seek + Read,
     {
         let stream_info = SingleItemStreamInfo::from_stream(reader)?;
-        UnrealString::seek_past(reader, &stream_info)
+        UnrealString::seek_past_with_info(reader, &stream_info)
     }
 
     pub fn parse_in_stream<R>(reader: &mut R) -> Result<Self>
@@ -136,7 +164,7 @@ impl UnrealString {
         R: Seek + Read,
     {
         let stream_info = SingleItemStreamInfo::from_stream(reader)?;
-        UnrealString::parse(reader, &stream_info)
+        UnrealString::parse_with_info(reader, &stream_info)
     }
 }
 
@@ -148,7 +176,7 @@ impl Deferrable for UnrealString {
 }
 
 impl Skippable for UnrealString {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -168,7 +196,7 @@ impl Skippable for UnrealString {
 }
 
 impl Parseable for UnrealString {
-    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
     where
         R: Seek + Read,
     {
@@ -243,7 +271,7 @@ impl<ElementType> Skippable for UnrealArray<ElementType>
 where
     ElementType: Skippable<StreamInfoType = SingleItemStreamInfo>,
 {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -253,7 +281,7 @@ where
             let element_stream_info = SingleItemStreamInfo {
                 offset: reader.stream_position()?,
             };
-            ElementType::seek_past(reader, &element_stream_info)?;
+            ElementType::seek_past_with_info(reader, &element_stream_info)?;
         }
 
         Ok(())
@@ -264,7 +292,7 @@ impl<ElementType> Parseable for UnrealArray<ElementType>
 where
     ElementType: Parseable<StreamInfoType = SingleItemStreamInfo>,
 {
-    fn parse<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
     where
         R: Seek + Read,
     {
@@ -275,10 +303,28 @@ where
             let element_stream_info = SingleItemStreamInfo {
                 offset: reader.stream_position()?,
             };
-            elements.push(ElementType::parse(reader, &element_stream_info)?);
+            elements.push(ElementType::parse_with_info(reader, &element_stream_info)?);
         }
 
         Ok(UnrealArray { elements })
+    }
+}
+
+/// Size of FGuid
+const GUID_SIZE: u64 = 16;
+pub struct UnrealGuid {}
+
+impl Deferrable for UnrealGuid {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Skippable for UnrealGuid {
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset + GUID_SIZE))?;
+        Ok(())
     }
 }
 
@@ -292,7 +338,7 @@ impl Deferrable for UnrealCustomVersion {
 }
 
 impl Skippable for UnrealCustomVersion {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -310,7 +356,7 @@ impl Deferrable for UnrealGenerationInfo {
 }
 
 impl Skippable for UnrealGenerationInfo {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -328,7 +374,7 @@ impl Deferrable for UnrealCompressedChunk {
 }
 
 impl Skippable for UnrealCompressedChunk {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
@@ -347,12 +393,12 @@ impl Deferrable for UnrealEngineVersion {
 }
 
 impl Skippable for UnrealEngineVersion {
-    fn seek_past<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
     {
         // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
-        let _engine_version_branch_name = UnrealString::seek_past(
+        let _engine_version_branch_name = UnrealString::seek_past_with_info(
             reader,
             &SingleItemStreamInfo {
                 offset: stream_info.offset + ENGINE_VERSION_BASE_SIZE,
