@@ -114,13 +114,13 @@ impl Parseable for UnrealString {
 }
 
 #[derive(Debug)]
-pub struct UnrealNameWithHash {}
+pub struct UnrealNameEntryWithHash {}
 
-impl Deferrable for UnrealNameWithHash {
+impl Deferrable for UnrealNameEntryWithHash {
     type StreamInfoType = SingleItemStreamInfo;
 }
 
-impl Skippable for UnrealNameWithHash {
+impl Skippable for UnrealNameEntryWithHash {
     fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
         R: Seek + Read,
@@ -132,7 +132,7 @@ impl Skippable for UnrealNameWithHash {
     }
 }
 
-impl Parseable for UnrealNameWithHash {
+impl Parseable for UnrealNameEntryWithHash {
     type ParsedType = String;
 
     fn parse_with_info_seekless<R>(

@@ -7,7 +7,7 @@ use error::{Error, Result};
 use serialization::{
     ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
     UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
-    UnrealGuid, UnrealNameWithHash, UnrealString,
+    UnrealGuid, UnrealNameEntryWithHash, UnrealString,
 };
 use std::io::{Read, Seek};
 
@@ -86,7 +86,7 @@ impl PackageFileSummary {
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
 
         let names = if file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
-            UnrealArray::<UnrealNameWithHash>::parse_indirect(&mut reader)?
+            UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut reader)?
         } else {
             UnrealArray::<UnrealString>::parse_indirect(&mut reader)?
         };
