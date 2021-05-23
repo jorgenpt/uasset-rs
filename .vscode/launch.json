@@ -7,25 +7,6 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'uasset'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--lib",
-                    "--package=uasset"
-                ],
-                "filter": {
-                    "name": "uasset",
-                    "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
             "name": "Debug executable 'uasset'",
             "cargo": {
                 "args": [
@@ -47,21 +28,40 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'uasset'",
+            "name": "Debug basic_parsing tests in library 'uasset'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=uasset",
+                    "--tests",
                     "--package=uasset"
                 ],
                 "filter": {
-                    "name": "uasset",
-                    "kind": "bin"
+                    "name": "basic_parsing",
+                    "kind": "test"
                 }
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug asset_references tests in library 'uasset'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--tests",
+                    "--package=uasset"
+                ],
+                "filter": {
+                    "name": "asset_references",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }
