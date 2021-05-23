@@ -30,11 +30,16 @@ pub trait Parseable: Deferrable
 where
     Self: Sized,
 {
-    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    type ParsedType: Sized;
+
+    fn parse_with_info<R>(
+        reader: &mut R,
+        stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
     where
         R: Seek + Read;
 
-    fn parse_inline<R>(reader: &mut R) -> Result<Self>
+    fn parse_inline<R>(reader: &mut R) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
@@ -42,7 +47,7 @@ where
         Ok(Self::parse_with_info(reader, &stream_info)?)
     }
 
-    fn parse_indirect<R>(reader: &mut R) -> Result<Self>
+    fn parse_indirect<R>(reader: &mut R) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
@@ -146,27 +151,7 @@ impl StreamInfo for ArrayStreamInfo {
 }
 
 #[derive(Debug)]
-pub struct UnrealString {
-    pub value: String,
-}
-
-impl UnrealString {
-    pub fn skip_in_stream<R>(reader: &mut R) -> Result<()>
-    where
-        R: Seek + Read,
-    {
-        let stream_info = SingleItemStreamInfo::from_stream(reader)?;
-        UnrealString::seek_past_with_info(reader, &stream_info)
-    }
-
-    pub fn parse_in_stream<R>(reader: &mut R) -> Result<Self>
-    where
-        R: Seek + Read,
-    {
-        let stream_info = SingleItemStreamInfo::from_stream(reader)?;
-        UnrealString::parse_with_info(reader, &stream_info)
-    }
-}
+pub struct UnrealString {}
 
 const UCS2_WIDTH: i64 = 2;
 const ASCII_WIDTH: i64 = 1;
@@ -196,7 +181,12 @@ impl Skippable for UnrealString {
 }
 
 impl Parseable for UnrealString {
-    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    type ParsedType = String;
+
+    fn parse_with_info<R>(
+        reader: &mut R,
+        stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
@@ -249,9 +239,7 @@ impl Parseable for UnrealString {
             }
         };
 
-        Ok(UnrealString {
-            value: String::from_utf8(utf8_bytes)?,
-        })
+        Ok(String::from_utf8(utf8_bytes)?)
     }
 }
 
@@ -292,7 +280,12 @@ impl<ElementType> Parseable for UnrealArray<ElementType>
 where
     ElementType: Parseable<StreamInfoType = SingleItemStreamInfo>,
 {
-    fn parse_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<Self>
+    type ParsedType = Vec<ElementType::ParsedType>;
+
+    fn parse_with_info<R>(
+        reader: &mut R,
+        stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
@@ -306,7 +299,7 @@ where
             elements.push(ElementType::parse_with_info(reader, &element_stream_info)?);
         }
 
-        Ok(UnrealArray { elements })
+        Ok(elements)
     }
 }
 

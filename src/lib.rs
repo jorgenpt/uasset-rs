@@ -21,11 +21,11 @@ pub struct PackageFileSummary {
     pub file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
     pub file_version_licensee_ue4: i32,
     pub total_header_size: i32,
-    pub folder_name: UnrealString,
+    pub folder_name: String,
     pub package_flags: u32, // TODO: PackageFlags
     pub name_count: i32,
     name_offset: i32,
-    pub localization_id: Option<UnrealString>,
+    pub localization_id: Option<String>,
     pub gatherable_text_data_count: i32,
     gatherable_text_data_offset: i32,
     pub export_count: i32,
@@ -39,7 +39,7 @@ pub struct PackageFileSummary {
     pub thumbnail_table_offset: i32,
     pub compression_flags: u32,
     pub package_source: u32,
-    pub additional_packages_to_cook: UnrealArray<UnrealString>,
+    pub additional_packages_to_cook: Vec<String>,
     pub texture_allocations: Option<i32>,
     asset_data_offset: i32,
 }
@@ -225,7 +225,7 @@ impl PackageFileSummary {
         })
     }
 
-    pub fn get_names<R>(&self, mut reader: R) -> Result<Vec<UnrealString>>
+    pub fn get_names<R>(&self, mut reader: R) -> Result<Vec<String>>
     where
         R: Seek + Read,
     {
@@ -237,12 +237,12 @@ impl PackageFileSummary {
         reader.seek(SeekFrom::Start(self.name_offset as u64))?;
         if self.file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
             for _ in 0..self.name_count {
-                names.push(UnrealString::parse_in_stream(&mut reader)?);
+                names.push(UnrealString::parse_inline(&mut reader)?);
                 let _name_hash: u32 = reader.read_le()?;
             }
         } else {
             for _ in 0..self.name_count {
-                names.push(UnrealString::parse_in_stream(&mut reader)?);
+                names.push(UnrealString::parse_inline(&mut reader)?);
             }
         }
 
