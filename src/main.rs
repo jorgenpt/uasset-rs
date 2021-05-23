@@ -13,6 +13,8 @@ fn main() {
 
     for path in options.paths {
         let file = File::open(path).unwrap();
-        println!("{:#?}", PackageFileSummary::new(file));
+        let summary = PackageFileSummary::new(&file).unwrap();
+        println!("{:#?}", summary);
+        println!("{:#?}", summary.get_names(file));
     }
 }

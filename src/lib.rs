@@ -228,23 +228,28 @@ impl PackageFileSummary {
         })
     }
 
-    pub fn get_names<R>(&self, mut reader: R) -> Result<()>
+    pub fn get_names<R>(&self, mut reader: R) -> Result<Vec<UnrealString>>
     where
         R: Seek + Read,
     {
+        if self.name_count <= 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut names = Vec::with_capacity(self.name_count as usize);
         reader.seek(SeekFrom::Start(self.name_offset as u64))?;
         if self.file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
             for _ in 0..self.name_count {
-                let _name = UnrealString::skip_in_stream(&mut reader)?;
-                let _name_hash = reader.read_le()?;
+                names.push(UnrealString::parse_in_stream(&mut reader)?);
+                let _name_hash: u32 = reader.read_le()?;
             }
         } else {
             for _ in 0..self.name_count {
-                let _name = UnrealString::skip_in_stream(&mut reader)?;
+                names.push(UnrealString::parse_in_stream(&mut reader)?);
             }
         }
 
-        Ok(())
+        Ok(names)
     }
 
     pub fn get_imports<R>(&self, mut reader: R) -> Result<()>
