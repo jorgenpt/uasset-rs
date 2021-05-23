@@ -60,11 +60,12 @@ use std::{
 };
 
 pub use enums::{ObjectVersion, PackageFlags};
-pub use error::{Error, Result};
+pub use error::{Error, InvalidNameIndexError, Result};
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
+/// Iterator over the imported packages in a given [`PackageFileSummary`]
 pub struct ImportIterator<'a> {
     package: &'a PackageFileSummary,
     next_index: usize,
@@ -76,6 +77,9 @@ impl<'a> ImportIterator<'a> {
     pub fn new(package: &'a PackageFileSummary) -> Self {
         let package_name_reference = package.find_name("Package");
         let core_uobject_package_name_reference = package.find_name("/Script/CoreUObject");
+
+        // If we can't find the "Package" name in the package, then there can't be any imports referencing it, so return an iterator
+        // that'll return zero elements.
         match package_name_reference {
             Some(package_name_reference) => Self {
                 package: &package,
@@ -122,7 +126,9 @@ impl<'a> Iterator for ImportIterator<'a> {
     }
 }
 
-/// The header of any UPackage asset
+/// A table of contents for a uasset loaded from disk, containing all the shared package summary information.
+/// This roughly maps to `FPackageFileSummary` in Engine/Source/Runtime/CoreUObject/Public/UObject/PackageFileSummary.h, except we
+/// load some of the indirectly referenced data (i.e. names, imports, exports).
 #[derive(Debug)]
 pub struct PackageFileSummary {
     pub file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
@@ -338,6 +344,8 @@ impl PackageFileSummary {
         })
     }
 
+    /// Attempt to look up `find_name` in the name table serialized in [`PackageFileSummary::names`], will return None
+    /// if the name does not exist. Names are case insensitive.
     pub fn find_name(&self, find_name: &str) -> Option<NameReference> {
         // TODO: Handle `_N` suffixes -> number: Some?
         let find_name_lower = find_name.to_lowercase();
@@ -353,7 +361,11 @@ impl PackageFileSummary {
         None
     }
 
-    pub fn resolve_name<'a>(&'a self, name_reference: &NameReference) -> Result<Cow<'a, str>> {
+    /// Look up the string representation for a given [`NameReference`].
+    pub fn resolve_name<'a>(
+        &'a self,
+        name_reference: &NameReference,
+    ) -> std::result::Result<Cow<'a, str>, InvalidNameIndexError> {
         let index = name_reference.index as usize;
         if self.names.len() > index {
             let mut name = Cow::from(&self.names[index]);
@@ -362,10 +374,11 @@ impl PackageFileSummary {
             }
             Ok(name)
         } else {
-            Err(Error::InvalidNameIndex(name_reference.index))
+            Err(InvalidNameIndexError(name_reference.index))
         }
     }
 
+    /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
     pub fn package_import_iter<'a>(&'a self) -> ImportIterator<'a> {
         ImportIterator::new(self)
     }

@@ -1,4 +1,5 @@
-/// enum EUnrealEngineObjectUE4Version from Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h
+/// Maps to `EUnrealEngineObjectUE4Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
+/// the various versions to the core serialized object format.
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
 pub enum ObjectVersion {
@@ -313,7 +314,8 @@ pub enum ObjectVersion {
     VER_UE4_CORRECT_LICENSEE_FLAG = 522,
 }
 
-/// enum EPackageFlags in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h
+/// Maps to `EPackageFlags` in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h. The `UnusedN` entries
+/// exist for completeness, presumably those entries were used in the past.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum PackageFlags {

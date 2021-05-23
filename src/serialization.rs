@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::Result;
 use binread::BinReaderExt;
 use std::io::{Read, Seek, SeekFrom};
 

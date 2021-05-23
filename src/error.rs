@@ -1,7 +1,9 @@
 use thiserror::Error;
 
+/// Results from parsing a uasset
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Errors from parsing an asset
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("data is not a uasset")]
@@ -16,8 +18,6 @@ pub enum Error {
     IoError(std::io::Error),
     #[error("failed to parse string in asset: {0:?}")]
     InvalidStringError(std::string::FromUtf8Error),
-    #[error("invalid name index in asset: {0:?}")]
-    InvalidNameIndex(u32),
 }
 
 impl From<binread::Error> for Error {
@@ -31,3 +31,8 @@ impl From<std::io::Error> for Error {
         Error::IoError(error)
     }
 }
+
+/// Error when attempting to resolve an index
+#[derive(Error, Debug)]
+#[error("invalid name index in asset: {0:?}")]
+pub struct InvalidNameIndexError(pub u32);
