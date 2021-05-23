@@ -1,16 +1,17 @@
+mod enums;
 mod error;
-mod types;
+mod serialization;
 
 use binread::BinReaderExt;
 use error::{Error, Result};
-use std::io::{Read, Seek};
-use types::{
+use serialization::{
     ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
     UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
     UnrealGuid, UnrealNameWithHash, UnrealString,
 };
+use std::io::{Read, Seek};
 
-pub use types::{ObjectVersion, PackageFlags};
+pub use enums::{ObjectVersion, PackageFlags};
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
