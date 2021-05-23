@@ -106,6 +106,14 @@ impl UnrealString {
         let stream_info = SingleItemStreamInfo::from_stream(reader)?;
         UnrealString::seek_past(reader, &stream_info)
     }
+
+    pub fn parse_in_stream<R>(reader: &mut R) -> Result<Self>
+    where
+        R: Seek + Read,
+    {
+        let stream_info = SingleItemStreamInfo::from_stream(reader)?;
+        UnrealString::parse(reader, &stream_info)
+    }
 }
 
 const UCS2_WIDTH: i64 = 2;
