@@ -5,7 +5,7 @@ use binread::BinReaderExt;
 use error::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 use types::{
-    ArrayStreamInfo, IoDeferred, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
+    ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, StreamInfo, UnrealArray,
     UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
     UnrealString,
 };
@@ -23,9 +23,11 @@ pub struct PackageFileSummary {
     pub file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
     pub file_version_licensee_ue4: i32,
     pub total_header_size: i32,
+    pub folder_name: UnrealString,
     pub package_flags: u32, // TODO: PackageFlags
     pub name_count: i32,
     name_offset: i32,
+    pub localization_id: Option<UnrealString>,
     pub gatherable_text_data_count: i32,
     gatherable_text_data_offset: i32,
     pub export_count: i32,
@@ -39,9 +41,18 @@ pub struct PackageFileSummary {
     pub thumbnail_table_offset: i32,
     pub compression_flags: u32,
     pub package_source: u32,
-    pub additional_packages_to_cook: IoDeferred<UnrealArray<UnrealString>>,
+    pub additional_packages_to_cook: UnrealArray<UnrealString>,
     pub texture_allocations: Option<i32>,
     asset_data_offset: i32,
+}
+
+fn read_from_current_position<T, R>(reader: &mut R) -> Result<T>
+where
+    R: Seek + Read,
+    T: Parseable + Skippable,
+{
+    let stream_info = T::StreamInfoType::from_current_position(reader)?;
+    Ok(T::parse(reader, &stream_info)?)
 }
 
 impl PackageFileSummary {
@@ -80,7 +91,7 @@ impl PackageFileSummary {
 
         let total_header_size = reader.read_le()?;
 
-        let _folder_name = UnrealString::skip_in_stream(&mut reader)?;
+        let folder_name = read_from_current_position(&mut reader)?;
 
         let package_flags = reader.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
@@ -90,11 +101,11 @@ impl PackageFileSummary {
 
         let supports_localization_id =
             file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
-        if supports_localization_id {
-            if has_editor_only_data {
-                let _localization_id = UnrealString::skip_in_stream(&mut reader)?;
-            }
-        }
+        let localization_id = if supports_localization_id && has_editor_only_data {
+            Some(read_from_current_position(&mut reader)?)
+        } else {
+            None
+        };
 
         let has_gatherable_text_data =
             file_version_ue4 >= ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
@@ -184,15 +195,7 @@ impl PackageFileSummary {
         // otherwise. Weird. Used to determine if an asset was made "by a modder or by Epic (or licensee)".
         let package_source = reader.read_le()?;
 
-        let num_additional_packages_to_cook: i32 = reader.read_le()?;
-        let additional_packages_to_cook_stream_info = ArrayStreamInfo {
-            offset: reader.stream_position()?,
-            count: num_additional_packages_to_cook as u64,
-        };
-        let additional_packages_to_cook = IoDeferred::Present(UnrealArray::<UnrealString>::parse(
-            &mut reader,
-            &additional_packages_to_cook_stream_info,
-        )?);
+        let additional_packages_to_cook = read_from_current_position(&mut reader)?;
 
         let texture_allocations = if legacy_version > -7 {
             Some(reader.read_le()?)
@@ -206,9 +209,11 @@ impl PackageFileSummary {
             file_version_ue4,
             file_version_licensee_ue4,
             total_header_size,
+            folder_name,
             package_flags,
             name_count,
             name_offset,
+            localization_id,
             gatherable_text_data_count,
             gatherable_text_data_offset,
             export_count,

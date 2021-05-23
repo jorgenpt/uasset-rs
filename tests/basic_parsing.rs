@@ -22,3 +22,4 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
         version_info.object_version as i32
     );
 }
+
