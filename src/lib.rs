@@ -5,12 +5,15 @@ mod serialization;
 use binread::BinReaderExt;
 use error::{Error, Result};
 use serialization::{
-    ArrayStreamInfo, ClassImport, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
-    UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
+    ArrayStreamInfo, ClassImport, NameReference, Parseable, SingleItemStreamInfo, Skippable,
+    UnrealArray, UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
     UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid,
     UnrealNameEntryWithHash, UnrealString,
 };
-use std::io::{Read, Seek};
+use std::{
+    borrow::Cow,
+    io::{Read, Seek},
+};
 
 pub use enums::{ObjectVersion, PackageFlags};
 
@@ -231,5 +234,18 @@ impl PackageFileSummary {
             texture_allocations,
             asset_data_offset,
         })
+    }
+
+    pub fn resolve_name<'a>(&'a self, name_reference: &NameReference) -> Result<Cow<'a, str>> {
+        let index = name_reference.index as usize;
+        if self.names.len() > index {
+            let mut name = Cow::from(&self.names[index]);
+            if let Some(number) = name_reference.number {
+                name.to_mut().push_str(&format!("_{}", number.get() - 1));
+            }
+            Ok(name)
+        } else {
+            Err(Error::InvalidNameIndex(name_reference.index))
+        }
     }
 }

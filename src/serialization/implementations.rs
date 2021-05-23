@@ -1,14 +1,13 @@
 use binread::BinReaderExt;
 use bit_field::BitField;
 use std::{
-    borrow::Cow,
     io::{Read, Seek, SeekFrom},
     mem::size_of,
     num::NonZeroU32,
 };
 
 use crate::{
-    error::{Error, Result},
+    error::Result,
     serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
 };
 
@@ -312,23 +311,8 @@ impl Skippable for UnrealEngineVersion {
 
 #[derive(Debug)]
 pub struct NameReference {
-    index: u32,
-    number: Option<NonZeroU32>,
-}
-
-impl NameReference {
-    pub fn to_string<'a>(&self, names: &'a [String]) -> Result<Cow<'a, str>> {
-        let index = self.index as usize;
-        if names.len() > index {
-            let mut name = Cow::from(&names[index]);
-            if let Some(number) = self.number {
-                name.to_mut().push_str(&format!("_{}", number.get() - 1));
-            }
-            Ok(name)
-        } else {
-            Err(Error::InvalidNameIndex(self.index))
-        }
-    }
+    pub index: u32,
+    pub number: Option<NonZeroU32>,
 }
 
 #[derive(Debug)]
