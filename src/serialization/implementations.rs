@@ -1,12 +1,14 @@
 use binread::BinReaderExt;
 use bit_field::BitField;
 use std::{
+    borrow::Cow,
     io::{Read, Seek, SeekFrom},
     mem::size_of,
+    num::NonZeroU32,
 };
 
 use crate::{
-    error::Result,
+    error::{Error, Result},
     serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
 };
 
@@ -194,8 +196,6 @@ where
     where
         R: Seek + Read,
     {
-        reader.seek(SeekFrom::Start(stream_info.offset))?;
-
         // The elements will be sequential, so we use the `seekless` trait method and just pass a bogus
         // offset.
         let invalid_stream_info = SingleItemStreamInfo { offset: u64::MAX };
@@ -307,5 +307,121 @@ impl Skippable for UnrealEngineVersion {
             },
         )?;
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct NameReference {
+    index: u32,
+    number: Option<NonZeroU32>,
+}
+
+impl NameReference {
+    pub fn to_string<'a>(&self, names: &'a [String]) -> Result<Cow<'a, str>> {
+        let index = self.index as usize;
+        if names.len() > index {
+            let mut name = Cow::from(&names[index]);
+            if let Some(number) = self.number {
+                name.to_mut().push_str(&format!("_{}", number.get() - 1));
+            }
+            Ok(name)
+        } else {
+            Err(Error::InvalidNameIndex(self.index))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UnrealNameReference {}
+
+impl Deferrable for UnrealNameReference {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Parseable for UnrealNameReference {
+    type ParsedType = NameReference;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        let index = reader.read_le()?;
+        let number = NonZeroU32::new(reader.read_le()?);
+        Ok(Self::ParsedType { index, number })
+    }
+}
+
+#[derive(Debug)]
+pub struct ClassImport {
+    pub class_package: NameReference,
+    pub class_name: NameReference,
+    pub outer_index: i32,
+    pub object_name: NameReference,
+    pub package_name: Option<NameReference>,
+}
+
+#[derive(Debug)]
+pub struct UnrealClassImport {}
+
+impl Deferrable for UnrealClassImport {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Parseable for UnrealClassImport {
+    type ParsedType = ClassImport;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        let class_package = UnrealNameReference::parse_inline(reader)?;
+        let class_name = UnrealNameReference::parse_inline(reader)?;
+        let outer_index = reader.read_le()?;
+        let object_name = UnrealNameReference::parse_inline(reader)?;
+        Ok(Self::ParsedType {
+            class_package,
+            class_name,
+            outer_index,
+            object_name,
+            package_name: None,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct UnrealClassImportWithPackageName {}
+
+impl Deferrable for UnrealClassImportWithPackageName {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Parseable for UnrealClassImportWithPackageName {
+    type ParsedType = ClassImport;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        let class_package = UnrealNameReference::parse_inline(reader)?;
+        let class_name = UnrealNameReference::parse_inline(reader)?;
+        let outer_index = reader.read_le()?;
+        let object_name = UnrealNameReference::parse_inline(reader)?;
+        let package_name = UnrealNameReference::parse_inline(reader)?;
+        Ok(Self::ParsedType {
+            class_package,
+            class_name,
+            outer_index,
+            object_name,
+            package_name: Some(package_name),
+        })
     }
 }

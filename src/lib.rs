@@ -5,9 +5,10 @@ mod serialization;
 use binread::BinReaderExt;
 use error::{Error, Result};
 use serialization::{
-    ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
-    UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
-    UnrealGuid, UnrealNameEntryWithHash, UnrealString,
+    ArrayStreamInfo, ClassImport, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
+    UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
+    UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid,
+    UnrealNameEntryWithHash, UnrealString,
 };
 use std::io::{Read, Seek};
 
@@ -30,8 +31,7 @@ pub struct PackageFileSummary {
     gatherable_text_data_offset: i32,
     pub export_count: i32,
     export_offset: i32,
-    pub import_count: i32,
-    import_offset: i32,
+    pub imports: Vec<ClassImport>,
     depends_offset: i32,
     pub string_reference_count: i32,
     string_reference_offset: i32,
@@ -110,8 +110,15 @@ impl PackageFileSummary {
 
         let export_count = reader.read_le()?;
         let export_offset = reader.read_le()?;
-        let import_count = reader.read_le()?;
-        let import_offset = reader.read_le()?;
+
+        let imports = if file_version_ue4 >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32
+            && has_editor_only_data
+        {
+            UnrealArray::<UnrealClassImportWithPackageName>::parse_indirect(&mut reader)?
+        } else {
+            UnrealArray::<UnrealClassImport>::parse_indirect(&mut reader)?
+        };
+
         let depends_offset = reader.read_le()?;
 
         let has_string_asset_references_map =
@@ -212,8 +219,7 @@ impl PackageFileSummary {
             gatherable_text_data_offset,
             export_count,
             export_offset,
-            import_count,
-            import_offset,
+            imports,
             depends_offset,
             string_reference_count,
             string_reference_offset,

@@ -16,6 +16,8 @@ pub enum Error {
     IoError(std::io::Error),
     #[error("failed to parse string in asset: {0:?}")]
     InvalidStringError(std::string::FromUtf8Error),
+    #[error("invalid name index in asset: {0:?}")]
+    InvalidNameIndex(u32),
 }
 
 impl From<binread::Error> for Error {

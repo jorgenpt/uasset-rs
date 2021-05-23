@@ -15,5 +15,14 @@ fn main() {
         let file = File::open(path).unwrap();
         let summary = PackageFileSummary::new(&file).unwrap();
         println!("{:#?}", summary);
+
+        for import in summary.imports {
+            println!(
+                "Class Package: {} Class Name: {} Object Name: {}",
+                import.class_package.to_string(&summary.names).unwrap(),
+                import.class_name.to_string(&summary.names).unwrap(),
+                import.object_name.to_string(&summary.names).unwrap(),
+            );
+        }
     }
 }
