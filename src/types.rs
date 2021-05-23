@@ -1,6 +1,9 @@
 use binread::BinReaderExt;
 use bit_field::BitField;
-use std::io::{Read, Seek, SeekFrom};
+use std::{
+    io::{Read, Seek, SeekFrom},
+    mem::size_of,
+};
 
 use crate::error::Result;
 
@@ -152,8 +155,8 @@ impl StreamInfo for ArrayStreamInfo {
     where
         R: Read + BinReaderExt,
     {
-        let offset: i32 = reader.read_le()?;
         let count: i32 = reader.read_le()?;
+        let offset: i32 = reader.read_le()?;
         Ok(Self {
             offset: offset as u64,
             count: count as u64,
@@ -161,11 +164,80 @@ impl StreamInfo for ArrayStreamInfo {
     }
 }
 
+fn skip_string<R>(reader: &mut R) -> Result<()>
+where
+    R: Seek + Read,
+{
+    let length: i32 = reader.read_le()?;
+    let (length, character_width) = if length < 0 {
+        // For UCS2 strings
+        (-length, 2)
+    } else {
+        // For ASCII strings
+        (length, 1)
+    };
+
+    reader.seek(SeekFrom::Current(length as i64 * character_width))?;
+
+    Ok(())
+}
+
+fn parse_string<R>(reader: &mut R) -> Result<String>
+where
+    R: Seek + Read,
+{
+    let utf8_bytes = {
+        let length: i32 = reader.read_le()?;
+        if length < 0 {
+            // Omit the trailing \0
+            let length = -length as usize - 1;
+            // Each UCS-2 code point can map to at most 3 UTF-8 bytes (it only encodes the basic multilingual plane of UTF8).
+            let mut utf8_bytes = Vec::with_capacity(3 * length);
+            // We could use as_mut_ptr + ptr::write + from_raw_parts_in, since we know that we'll never go out of bounds for the capacity we've reserved.
+            for _ in 0..length {
+                let ch: u16 = reader.read_le()?;
+                if (0x000..0x0080).contains(&ch) {
+                    utf8_bytes.push(ch as u8);
+                } else if (0x0080..0x0800).contains(&ch) {
+                    let first = 0b1100_0000 + ch.get_bits(6..11) as u8;
+                    let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+
+                    utf8_bytes.push(first);
+                    utf8_bytes.push(last);
+                } else {
+                    let first = 0b1110_0000 + ch.get_bits(12..16) as u8;
+                    let mid = 0b1000_0000 + ch.get_bits(6..12) as u8;
+                    let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+
+                    utf8_bytes.push(first);
+                    utf8_bytes.push(mid);
+                    utf8_bytes.push(last);
+                }
+            }
+
+            // Skip the trailing \0
+            reader.seek(SeekFrom::Current(2))?;
+
+            utf8_bytes.shrink_to_fit();
+            utf8_bytes
+        } else {
+            // Omit the trailing \0
+            let length = length - 1;
+            let mut utf8_bytes = Vec::new();
+            utf8_bytes.resize(length as usize, 0u8);
+            reader.read_exact(&mut utf8_bytes)?;
+            // Skip the trailing \0
+            reader.seek(SeekFrom::Current(1))?;
+
+            utf8_bytes
+        }
+    };
+
+    Ok(String::from_utf8(utf8_bytes)?)
+}
+
 #[derive(Debug)]
 pub struct UnrealString {}
-
-const UCS2_WIDTH: i64 = 2;
-const ASCII_WIDTH: i64 = 1;
 
 impl Deferrable for UnrealString {
     type StreamInfoType = SingleItemStreamInfo;
@@ -177,17 +249,7 @@ impl Skippable for UnrealString {
         R: Seek + Read,
     {
         reader.seek(SeekFrom::Start(stream_info.offset))?;
-
-        let length: i32 = reader.read_le()?;
-        let (length, character_width) = if length < 0 {
-            (-length, UCS2_WIDTH)
-        } else {
-            (length, ASCII_WIDTH)
-        };
-
-        reader.seek(SeekFrom::Current(length as i64 * character_width))?;
-
-        Ok(())
+        skip_string(reader)
     }
 }
 
@@ -201,54 +263,42 @@ impl Parseable for UnrealString {
     where
         R: Seek + Read,
     {
-        let utf8_bytes = {
-            let length: i32 = reader.read_le()?;
-            if length < 0 {
-                // Omit the trailing \0
-                let length = -length as usize - 1;
-                // Each UCS-2 code point can map to at most 3 UTF-8 bytes (it only encodes the basic multilingual plane of UTF8).
-                let mut utf8_bytes = Vec::with_capacity(3 * length);
-                // We could use as_mut_ptr + ptr::write + from_raw_parts_in, since we know that we'll never go out of bounds for the capacity we've reserved.
-                for _ in 0..length {
-                    let ch: u16 = reader.read_le()?;
-                    if (0x000..0x0080).contains(&ch) {
-                        utf8_bytes.push(ch as u8);
-                    } else if (0x0080..0x0800).contains(&ch) {
-                        let first = 0b1100_0000 + ch.get_bits(6..11) as u8;
-                        let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+        parse_string(reader)
+    }
+}
 
-                        utf8_bytes.push(first);
-                        utf8_bytes.push(last);
-                    } else {
-                        let first = 0b1110_0000 + ch.get_bits(12..16) as u8;
-                        let mid = 0b1000_0000 + ch.get_bits(6..12) as u8;
-                        let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+#[derive(Debug)]
+pub struct UnrealNameWithHash {}
 
-                        utf8_bytes.push(first);
-                        utf8_bytes.push(mid);
-                        utf8_bytes.push(last);
-                    }
-                }
+impl Deferrable for UnrealNameWithHash {
+    type StreamInfoType = SingleItemStreamInfo;
+}
 
-                // Skip the trailing \0
-                reader.seek(SeekFrom::Current(2))?;
+impl Skippable for UnrealNameWithHash {
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset))?;
+        skip_string(reader)?;
+        reader.seek(SeekFrom::Current(size_of::<u32>() as i64))?;
+        Ok(())
+    }
+}
 
-                utf8_bytes.shrink_to_fit();
-                utf8_bytes
-            } else {
-                // Omit the trailing \0
-                let length = length - 1;
-                let mut utf8_bytes = Vec::new();
-                utf8_bytes.resize(length as usize, 0u8);
-                reader.read_exact(&mut utf8_bytes)?;
-                // Skip the trailing \0
-                reader.seek(SeekFrom::Current(1))?;
+impl Parseable for UnrealNameWithHash {
+    type ParsedType = String;
 
-                utf8_bytes
-            }
-        };
-
-        Ok(String::from_utf8(utf8_bytes)?)
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        let string = parse_string(reader)?;
+        let _hash: u32 = reader.read_le()?;
+        Ok(string)
     }
 }
 

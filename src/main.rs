@@ -15,6 +15,5 @@ fn main() {
         let file = File::open(path).unwrap();
         let summary = PackageFileSummary::new(&file).unwrap();
         println!("{:#?}", summary);
-        println!("{:#?}", summary.get_names(file));
     }
 }

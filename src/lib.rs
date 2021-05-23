@@ -3,11 +3,11 @@ mod types;
 
 use binread::BinReaderExt;
 use error::{Error, Result};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek};
 use types::{
     ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray,
     UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo,
-    UnrealGuid, UnrealString,
+    UnrealGuid, UnrealNameWithHash, UnrealString,
 };
 
 pub use types::{ObjectVersion, PackageFlags};
@@ -23,8 +23,7 @@ pub struct PackageFileSummary {
     pub total_header_size: i32,
     pub folder_name: String,
     pub package_flags: u32, // TODO: PackageFlags
-    pub name_count: i32,
-    name_offset: i32,
+    pub names: Vec<String>,
     pub localization_id: Option<String>,
     pub gatherable_text_data_count: i32,
     gatherable_text_data_offset: i32,
@@ -85,8 +84,11 @@ impl PackageFileSummary {
         let package_flags = reader.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
 
-        let name_count = reader.read_le()?;
-        let name_offset = reader.read_le()?;
+        let names = if file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
+            UnrealArray::<UnrealNameWithHash>::parse_indirect(&mut reader)?
+        } else {
+            UnrealArray::<UnrealString>::parse_indirect(&mut reader)?
+        };
 
         let supports_localization_id =
             file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
@@ -203,8 +205,7 @@ impl PackageFileSummary {
             total_header_size,
             folder_name,
             package_flags,
-            name_count,
-            name_offset,
+            names,
             localization_id,
             gatherable_text_data_count,
             gatherable_text_data_offset,
@@ -223,29 +224,5 @@ impl PackageFileSummary {
             texture_allocations,
             asset_data_offset,
         })
-    }
-
-    pub fn get_names<R>(&self, mut reader: R) -> Result<Vec<String>>
-    where
-        R: Seek + Read,
-    {
-        if self.name_count <= 0 {
-            return Ok(Vec::new());
-        }
-
-        let mut names = Vec::with_capacity(self.name_count as usize);
-        reader.seek(SeekFrom::Start(self.name_offset as u64))?;
-        if self.file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
-            for _ in 0..self.name_count {
-                names.push(UnrealString::parse_inline(&mut reader)?);
-                let _name_hash: u32 = reader.read_le()?;
-            }
-        } else {
-            for _ in 0..self.name_count {
-                names.push(UnrealString::parse_inline(&mut reader)?);
-            }
-        }
-
-        Ok(names)
     }
 }

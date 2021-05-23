@@ -21,6 +21,13 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
         package_file_summary.file_version_ue4,
         version_info.object_version as i32
     );
+
+    assert!(
+        package_file_summary
+            .names
+            .contains(&String::from("/Game/SimpleRefs/SimpleRefsRoot")),
+        "Missing asset path in names"
+    );
 }
 
 #[apply(all_versions)]
