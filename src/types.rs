@@ -32,19 +32,30 @@ where
 {
     type ParsedType: Sized;
 
-    fn parse_with_info<R>(
+    fn parse_with_info_seekless<R>(
         reader: &mut R,
         stream_info: &Self::StreamInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read;
 
+    fn parse_with_info<R>(
+        reader: &mut R,
+        stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.get_offset()))?;
+        Self::parse_with_info_seekless(reader, stream_info)
+    }
+
     fn parse_inline<R>(reader: &mut R) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
         let stream_info = Self::StreamInfoType::from_current_position(reader)?;
-        Ok(Self::parse_with_info(reader, &stream_info)?)
+        Ok(Self::parse_with_info_seekless(reader, &stream_info)?)
     }
 
     fn parse_indirect<R>(reader: &mut R) -> Result<Self::ParsedType>
@@ -183,15 +194,13 @@ impl Skippable for UnrealString {
 impl Parseable for UnrealString {
     type ParsedType = String;
 
-    fn parse_with_info<R>(
+    fn parse_with_info_seekless<R>(
         reader: &mut R,
-        stream_info: &Self::StreamInfoType,
+        _stream_info: &Self::StreamInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
-        reader.seek(SeekFrom::Start(stream_info.offset))?;
-
         let utf8_bytes = {
             let length: i32 = reader.read_le()?;
             if length < 0 {
@@ -282,7 +291,7 @@ where
 {
     type ParsedType = Vec<ElementType::ParsedType>;
 
-    fn parse_with_info<R>(
+    fn parse_with_info_seekless<R>(
         reader: &mut R,
         stream_info: &Self::StreamInfoType,
     ) -> Result<Self::ParsedType>
@@ -291,12 +300,16 @@ where
     {
         reader.seek(SeekFrom::Start(stream_info.offset))?;
 
+        // The elements will be sequential, so we use the `seekless` trait method and just pass a bogus
+        // offset.
+        let invalid_stream_info = SingleItemStreamInfo { offset: u64::MAX };
+
         let mut elements = Vec::with_capacity(stream_info.count as usize);
         for _ in 0..stream_info.count {
-            let element_stream_info = SingleItemStreamInfo {
-                offset: reader.stream_position()?,
-            };
-            elements.push(ElementType::parse_with_info(reader, &element_stream_info)?);
+            elements.push(ElementType::parse_with_info_seekless(
+                reader,
+                &invalid_stream_info,
+            )?);
         }
 
         Ok(elements)

@@ -248,13 +248,4 @@ impl PackageFileSummary {
 
         Ok(names)
     }
-
-    pub fn get_imports<R>(&self, mut reader: R) -> Result<()>
-    where
-        R: Seek + Read,
-    {
-        reader.seek(SeekFrom::Start(self.import_offset as u64))?;
-
-        Ok(())
-    }
 }
