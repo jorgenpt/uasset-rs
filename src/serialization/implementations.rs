@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    error::Result,
     serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
+    Error, Result,
 };
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
@@ -80,7 +80,7 @@ where
         }
     };
 
-    Ok(String::from_utf8(utf8_bytes)?)
+    Ok(String::from_utf8(utf8_bytes).map_err(|e| Error::InvalidStringError(e))?)
 }
 
 #[derive(Debug)]

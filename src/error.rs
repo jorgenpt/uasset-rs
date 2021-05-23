@@ -31,9 +31,3 @@ impl From<std::io::Error> for Error {
         Error::IoError(error)
     }
 }
-
-impl From<std::string::FromUtf8Error> for Error {
-    fn from(error: std::string::FromUtf8Error) -> Self {
-        Error::InvalidStringError(error)
-    }
-}
