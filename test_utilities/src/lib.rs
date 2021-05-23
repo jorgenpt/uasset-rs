@@ -1,4 +1,4 @@
-use rstest_reuse::{self, *};
+pub use rstest_reuse::{self, template};
 use std::path::PathBuf;
 
 pub use uasset::ObjectVersion;
@@ -30,6 +30,22 @@ impl UnrealVersion {
     pub fn get_asset_base_path(&self) -> PathBuf {
         let mut path = PathBuf::from("assets");
         path.push(format!("UE{}{}", self.0, self.1));
+        path
+    }
+
+    pub fn resolve_ue_path(&self, ue_path: &str) -> PathBuf {
+        const CONTENT_PREFIX: &str = "/Game/";
+        assert!(
+            ue_path.starts_with(CONTENT_PREFIX),
+            "{} does not start with {}",
+            ue_path,
+            CONTENT_PREFIX
+        );
+
+        let mut path = PathBuf::from("assets");
+        path.push(format!("UE{}{}", self.0, self.1));
+        path.push(ue_path[CONTENT_PREFIX.len()..].to_owned());
+        path.set_extension("uasset");
         path
     }
 }

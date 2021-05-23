@@ -1,10 +1,8 @@
-mod unreal_versions;
-
 use std::fs::File;
 
 use rstest::rstest;
 use rstest_reuse::{self, *};
-use unreal_versions::*;
+use test_utilities::*;
 
 use uasset::PackageFileSummary;
 
