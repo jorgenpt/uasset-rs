@@ -3,7 +3,6 @@ mod error;
 mod serialization;
 
 use binread::BinReaderExt;
-use error::{Error, Result};
 use serialization::{
     ArrayStreamInfo, ClassImport, NameReference, Parseable, SingleItemStreamInfo, Skippable,
     UnrealArray, UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
@@ -16,9 +15,67 @@ use std::{
 };
 
 pub use enums::{ObjectVersion, PackageFlags};
+pub use error::{Error, Result};
 
 /// Magic sequence identifying a UPackage (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
+
+pub struct ImportIterator<'a> {
+    package: &'a PackageFileSummary,
+    next_index: usize,
+    package_name_reference: NameReference,
+    core_uobject_package_name_reference: Option<NameReference>,
+}
+
+impl<'a> ImportIterator<'a> {
+    pub fn new(package: &'a PackageFileSummary) -> Self {
+        let package_name_reference = package.find_name("Package");
+        let core_uobject_package_name_reference = package.find_name("/Script/CoreUObject");
+        match package_name_reference {
+            Some(package_name_reference) => Self {
+                package: &package,
+                next_index: 0,
+                package_name_reference,
+                core_uobject_package_name_reference,
+            },
+            None => Self {
+                package: &package,
+                next_index: package.imports.len(),
+                package_name_reference: NameReference {
+                    index: 0,
+                    number: None,
+                },
+                core_uobject_package_name_reference,
+            },
+        }
+    }
+}
+
+impl<'a> Iterator for ImportIterator<'a> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.next_index < self.package.imports.len() {
+            let import = &self.package.imports[self.next_index];
+            self.next_index += 1;
+            if import.class_name == self.package_name_reference {
+                if self
+                    .core_uobject_package_name_reference
+                    .map_or(false, |n| import.object_name != n)
+                {
+                    return Some(
+                        self.package
+                            .resolve_name(&import.object_name)
+                            .unwrap()
+                            .to_string(),
+                    );
+                }
+            }
+        }
+
+        None
+    }
+}
 
 /// The header of any UPackage asset
 #[derive(Debug)]
@@ -236,6 +293,21 @@ impl PackageFileSummary {
         })
     }
 
+    pub fn find_name(&self, find_name: &str) -> Option<NameReference> {
+        // TODO: Handle `_N` suffixes -> number: Some?
+        let find_name_lower = find_name.to_lowercase();
+        for (index, name) in self.names.iter().enumerate() {
+            if find_name == name || find_name_lower == name.to_lowercase() {
+                return Some(NameReference {
+                    index: index as u32,
+                    number: None,
+                });
+            }
+        }
+
+        None
+    }
+
     pub fn resolve_name<'a>(&'a self, name_reference: &NameReference) -> Result<Cow<'a, str>> {
         let index = name_reference.index as usize;
         if self.names.len() > index {
@@ -247,5 +319,9 @@ impl PackageFileSummary {
         } else {
             Err(Error::InvalidNameIndex(name_reference.index))
         }
+    }
+
+    pub fn package_import_iter<'a>(&'a self) -> ImportIterator<'a> {
+        ImportIterator::new(self)
     }
 }

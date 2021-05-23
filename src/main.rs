@@ -16,13 +16,8 @@ fn main() {
         let summary = PackageFileSummary::new(&file).unwrap();
         println!("{:#?}", summary);
 
-        for import in &summary.imports {
-            println!(
-                "Class Package: {} Class Name: {} Object Name: {}",
-                summary.resolve_name(&import.class_package).unwrap(),
-                summary.resolve_name(&import.class_name).unwrap(),
-                summary.resolve_name(&import.object_name).unwrap(),
-            );
+        for import in summary.package_import_iter() {
+            println!("Import: {}", import);
         }
     }
 }

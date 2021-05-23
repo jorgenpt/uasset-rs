@@ -309,7 +309,7 @@ impl Skippable for UnrealEngineVersion {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NameReference {
     pub index: u32,
     pub number: Option<NonZeroU32>,
