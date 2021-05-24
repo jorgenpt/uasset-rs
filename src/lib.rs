@@ -141,7 +141,7 @@ pub struct NameReference {
 /// A reference to an object in another package. Typically accessed through [`AssetHeader::package_import_iter`], but you can also
 /// manually resolve the [`NameReference`]s. (C++ name: `FObjectImport`)
 #[derive(Debug)]
-pub struct ClassImport {
+pub struct ObjectImport {
     /// The name of the package that contains the class of the object we're importing. (C++ name: `ClassPackage`)
     pub class_package: NameReference,
     /// The name of the class of the object we're importing. (C++ name: `ClassName`)
@@ -242,7 +242,7 @@ pub struct AssetHeader {
     /// Location on disk of the ExportMap data (C++ name: `ExportOffset`)
     pub export_offset: i32,
     /// Imports (dependencies) listed by this asset (C++ name: `ImportCount` and `ImportOffset`)
-    pub imports: Vec<ClassImport>,
+    pub imports: Vec<ObjectImport>,
     /// Location of DependsMap data (C++ name: `DependsOffset`)
     pub depends_offset: i32,
     /// Number of soft package references that are listed (C++ name: `SoftPackageReferencesCount`)

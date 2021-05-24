@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
-    ClassImport, Error, NameReference, Result,
+    Error, NameReference, ObjectImport, Result,
 };
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
@@ -341,7 +341,7 @@ impl Deferrable for UnrealClassImport {
 }
 
 impl Parseable for UnrealClassImport {
-    type ParsedType = ClassImport;
+    type ParsedType = ObjectImport;
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
@@ -372,7 +372,7 @@ impl Deferrable for UnrealClassImportWithPackageName {
 }
 
 impl Parseable for UnrealClassImportWithPackageName {
-    type ParsedType = ClassImport;
+    type ParsedType = ObjectImport;
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
