@@ -128,7 +128,8 @@ impl Skippable for UnrealNameEntryWithHash {
     {
         reader.seek(SeekFrom::Start(stream_info.offset))?;
         skip_string(reader)?;
-        reader.seek(SeekFrom::Current(size_of::<u32>() as i64))?;
+        // Seek past two hashes that are no longer used, NonCasePreservingHash and CasePreservingHash
+        reader.seek(SeekFrom::Current(size_of::<[u16; 2]>() as i64))?;
         Ok(())
     }
 }

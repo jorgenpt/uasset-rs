@@ -4,7 +4,7 @@ use rstest::rstest;
 use rstest_reuse::{self, *};
 use test_utilities::*;
 
-use uasset::PackageFileSummary;
+use uasset::AssetHeader;
 
 #[apply(all_versions)]
 fn simple_refs(#[case] version_info: UnrealVersionInfo) {
@@ -18,7 +18,7 @@ fn simple_refs(#[case] version_info: UnrealVersionInfo) {
 
     for (asset, expected_imports) in &expected_refs {
         let asset_path = version_info.version.resolve_ue_path(asset);
-        let package = PackageFileSummary::new(File::open(asset_path).unwrap()).unwrap();
+        let package = AssetHeader::new(File::open(asset_path).unwrap()).unwrap();
 
         let asset_imports: Vec<_> = package
             .package_import_iter()

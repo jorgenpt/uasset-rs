@@ -16,26 +16,26 @@
 //!
 //! ```toml
 //! [dependencies]
-//! uasset = "^0.1"
+//! uasset = "^0.2"
 //! ```
 //!
-//! Then import [`PackageFileSummary`] into your program:
+//! Then import [`AssetHeader`] into your program:
 //!
 //! ```rust
-//! use uasset::PackageFileSummary;
+//! use uasset::AssetHeader;
 //! ```
 //!
-//! Finally, parse a file using [`PackageFileSummary::new`].
+//! Finally, parse a file using [`AssetHeader::new`].
 //!
 //! ## Example
 //!
 //! ```rust
-//! # use uasset::{PackageFileSummary, Result};
+//! # use uasset::{AssetHeader, Result};
 //! # use std::{fs::File, path::PathBuf};
 //! # fn main() -> Result<()> {
 //! # let path = PathBuf::from("assets/UE410/SimpleRefs/SimpleRefsRoot.uasset");
 //! let file = File::open(path)?;
-//! let package = PackageFileSummary::new(&file)?;
+//! let package = AssetHeader::new(&file)?;
 //! for import in package.package_import_iter() {
 //!     println!("Import: {}", import);
 //! }
@@ -127,16 +127,16 @@ pub use error::{Error, InvalidNameIndexError, Result};
 /// Magic sequence identifying an unreal asset (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
-/// Iterator over the imported packages in a given [`PackageFileSummary`]
+/// Iterator over the imported packages in a given [`AssetHeader`]
 pub struct ImportIterator<'a> {
-    package: &'a PackageFileSummary,
+    package: &'a AssetHeader,
     next_index: usize,
     package_name_reference: NameReference,
     core_uobject_package_name_reference: Option<NameReference>,
 }
 
 impl<'a> ImportIterator<'a> {
-    pub fn new(package: &'a PackageFileSummary) -> Self {
+    pub fn new(package: &'a AssetHeader) -> Self {
         let package_name_reference = package.find_name("Package");
         let core_uobject_package_name_reference = package.find_name("/Script/CoreUObject");
 
@@ -191,11 +191,11 @@ impl<'a> Iterator for ImportIterator<'a> {
 /// This roughly maps to `FPackageFileSummary` in Engine/Source/Runtime/CoreUObject/Public/UObject/PackageFileSummary.h, except we
 /// load some of the indirectly referenced data (i.e. names, imports, exports).
 #[derive(Debug)]
-pub struct PackageFileSummary {
+pub struct AssetHeader {
     /// The serialization version used when saving this asset (C++ name: `FileVersionUE4`)
-    pub file_version_ue4: i32, // TODO: Use ObjectVersion enum
+    pub file_version: i32, // TODO: Use ObjectVersion enum
     /// The licensee serialization version used when saving this asset (C++ name: `FileVersionLicenseeUE4`)
-    pub file_version_licensee_ue4: i32,
+    pub file_licensee_version: i32,
     /// Full size of the asset header (C++ name: `TotalHeaderSize`)
     pub total_header_size: i32,
     /// The "Generic Browser" folder name that it lives in (C++ name: `FolderName`)
@@ -219,9 +219,9 @@ pub struct PackageFileSummary {
     /// Location of DependsMap data (C++ name: `DependsOffset`)
     depends_offset: i32,
     /// Number of soft package references that are listed (C++ name: `SoftPackageReferencesCount`)
-    pub string_reference_count: i32,
+    pub soft_package_references_count: i32,
     /// Location on disk of the soft package references (C++ name: `SoftPackageReferencesOffset`)
-    string_reference_offset: i32,
+    soft_package_references_offset: i32,
     /// Location of SearchableNamesMap data (C++ name: `SearchableNamesOffset`)
     searchable_names_offset: Option<i32>,
     /// Offset of the thumbnail table (C++ name: `ThumbnailTableOffset`)
@@ -236,11 +236,11 @@ pub struct PackageFileSummary {
     /// No longer used
     pub texture_allocations: Option<i32>,
     /// Location on disk of the asset registry tag data (C++ name: `AssetRegistryDataOffset`)
-    asset_data_offset: i32,
+    asset_registry_data_offset: i32,
 }
 
-impl PackageFileSummary {
-    /// Parse a [`PackageFileSummary`] from the given reader, assuming a little endian uasset
+impl AssetHeader {
+    /// Parse an [`AssetHeader`] from the given reader, assuming a little endian uasset
     pub fn new<R>(mut reader: R) -> Result<Self>
     where
         R: Seek + Read,
@@ -257,12 +257,13 @@ impl PackageFileSummary {
 
         let _legacy_ue3_version: i32 = reader.read_le()?;
 
-        let file_version_ue4 = reader.read_le()?;
-        let file_version_licensee_ue4 = reader.read_le()?;
-        if file_version_ue4 == 0 && file_version_licensee_ue4 == 0 {
+        let file_version = reader.read_le()?;
+        let file_licensee_version = reader.read_le()?;
+        if file_version == 0 && file_licensee_version == 0 {
             return Err(Error::UnversionedAsset);
         }
 
+        // Parse and seek past `CustomVersionContainer`
         let num_custom_versions: i32 = reader.read_le()?;
         let custom_versions_stream_info = ArrayStreamInfo {
             offset: reader.stream_position()?,
@@ -280,14 +281,14 @@ impl PackageFileSummary {
         let package_flags = reader.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
 
-        let names = if file_version_ue4 >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
+        let names = if file_version >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
             UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut reader)?
         } else {
             UnrealArray::<UnrealString>::parse_indirect(&mut reader)?
         };
 
         let supports_localization_id =
-            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
+            file_version >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
         let localization_id = if supports_localization_id && has_editor_only_data {
             Some(UnrealString::parse_inline(&mut reader)?)
         } else {
@@ -295,7 +296,7 @@ impl PackageFileSummary {
         };
 
         let has_gatherable_text_data =
-            file_version_ue4 >= ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
+            file_version >= ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
         let (gatherable_text_data_count, gatherable_text_data_offset) = if has_gatherable_text_data
         {
             (reader.read_le()?, reader.read_le()?)
@@ -306,7 +307,7 @@ impl PackageFileSummary {
         let export_count = reader.read_le()?;
         let export_offset = reader.read_le()?;
 
-        let imports = if file_version_ue4 >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32
+        let imports = if file_version >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32
             && has_editor_only_data
         {
             UnrealArray::<UnrealClassImportWithPackageName>::parse_indirect(&mut reader)?
@@ -317,15 +318,16 @@ impl PackageFileSummary {
         let depends_offset = reader.read_le()?;
 
         let has_string_asset_references_map =
-            file_version_ue4 >= ObjectVersion::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP as i32;
-        let (string_reference_count, string_reference_offset) = if has_string_asset_references_map {
-            (reader.read_le()?, reader.read_le()?)
-        } else {
-            (0, 0)
-        };
+            file_version >= ObjectVersion::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP as i32;
+        let (soft_package_references_count, soft_package_references_offset) =
+            if has_string_asset_references_map {
+                (reader.read_le()?, reader.read_le()?)
+            } else {
+                (0, 0)
+            };
 
         let has_searchable_names =
-            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES as i32;
+            file_version >= ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES as i32;
         let searchable_names_offset = if has_searchable_names {
             Some(reader.read_le()?)
         } else {
@@ -336,11 +338,11 @@ impl PackageFileSummary {
 
         let _guid = UnrealGuid::seek_past(&mut reader)?;
         let supports_package_owner =
-            file_version_ue4 >= ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER as i32;
+            file_version >= ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER as i32;
         if supports_package_owner && has_editor_only_data {
             let _persistent_guid = UnrealGuid::seek_past(&mut reader)?;
             let supports_non_outer_package_import =
-                file_version_ue4 < ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
+                file_version < ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
             if supports_non_outer_package_import {
                 let _owner_persistent_guid = UnrealGuid::seek_past(&mut reader)?;
             }
@@ -357,7 +359,7 @@ impl PackageFileSummary {
         )?;
 
         let has_engine_version_object =
-            file_version_ue4 >= ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT as i32;
+            file_version >= ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT as i32;
         if has_engine_version_object {
             let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
             let _saved_by_engine_version =
@@ -367,7 +369,7 @@ impl PackageFileSummary {
             // 4.26 converts this using FEngineVersion::Set(4, 0, 0, EngineChangelist, TEXT(""));
         }
 
-        let has_compatible_with_engine_version = file_version_ue4
+        let has_compatible_with_engine_version = file_version
             >= ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION as i32;
         if has_compatible_with_engine_version {
             let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
@@ -398,11 +400,11 @@ impl PackageFileSummary {
             None
         };
 
-        let asset_data_offset = reader.read_le()?;
+        let asset_registry_data_offset = reader.read_le()?;
 
         Ok(Self {
-            file_version_ue4,
-            file_version_licensee_ue4,
+            file_version,
+            file_licensee_version,
             total_header_size,
             folder_name,
             package_flags,
@@ -414,15 +416,15 @@ impl PackageFileSummary {
             export_offset,
             imports,
             depends_offset,
-            string_reference_count,
-            string_reference_offset,
+            soft_package_references_count,
+            soft_package_references_offset,
             searchable_names_offset,
             thumbnail_table_offset,
             compression_flags,
             package_source,
             additional_packages_to_cook,
             texture_allocations,
-            asset_data_offset,
+            asset_registry_data_offset,
         })
     }
 

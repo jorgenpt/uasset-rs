@@ -4,24 +4,21 @@ use rstest::rstest;
 use rstest_reuse::{self, *};
 use test_utilities::*;
 
-use uasset::PackageFileSummary;
+use uasset::AssetHeader;
 
 #[apply(all_versions)]
 fn loading_asset(#[case] version_info: UnrealVersionInfo) {
     let mut simple_refs_root = version_info.version.get_asset_base_path();
     simple_refs_root.push("SimpleRefs");
     simple_refs_root.push("SimpleRefsRoot.uasset");
-    let package_file_summary = PackageFileSummary::new(File::open(simple_refs_root).unwrap());
-    assert!(package_file_summary.is_ok());
-    let package_file_summary = package_file_summary.unwrap();
+    let header = AssetHeader::new(File::open(simple_refs_root).unwrap());
+    assert!(header.is_ok());
+    let header = header.unwrap();
 
-    assert_eq!(
-        package_file_summary.file_version_ue4,
-        version_info.object_version as i32
-    );
+    assert_eq!(header.file_version, version_info.object_version as i32);
 
     assert!(
-        package_file_summary
+        header
             .names
             .contains(&String::from("/Game/SimpleRefs/SimpleRefsRoot")),
         "Missing asset path in names"
@@ -37,18 +34,18 @@ fn upgrading_asset(#[case] version_info: UnrealVersionInfo) {
     let mut old_simple_refs_root = version_info.version.get_asset_base_path();
     old_simple_refs_root.push("SimpleRefs");
     old_simple_refs_root.push("SimpleRefsRoot.uasset");
-    let old_package_file_summary =
-        PackageFileSummary::new(File::open(old_simple_refs_root).unwrap()).unwrap();
+    let old_header = AssetHeader::new(File::open(old_simple_refs_root).unwrap()).unwrap();
 
     let mut new_simple_refs_root = version_info.next_version.unwrap().get_asset_base_path();
     new_simple_refs_root.push("SimpleRefs");
     new_simple_refs_root.push("SimpleRefsRoot.uasset");
-    let new_package_file_summary =
-        PackageFileSummary::new(File::open(new_simple_refs_root).unwrap()).unwrap();
+    let new_header = AssetHeader::new(File::open(new_simple_refs_root).unwrap()).unwrap();
 
-    assert!(new_package_file_summary.file_version_ue4 >= old_package_file_summary.file_version_ue4, "new_package_file_summary.file_version_ue4 = {}, old_package_file_summary.file_version_ue4 = {}", new_package_file_summary.file_version_ue4, old_package_file_summary.file_version_ue4);
-    assert_eq!(
-        new_package_file_summary.package_source,
-        old_package_file_summary.package_source
+    assert!(
+        new_header.file_version >= old_header.file_version,
+        "new_header.file_version_ue4 = {}, old_header.file_version_ue4 = {}",
+        new_header.file_version,
+        old_header.file_version
     );
+    assert_eq!(new_header.package_source, old_header.package_source);
 }

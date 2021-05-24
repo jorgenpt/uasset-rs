@@ -1,6 +1,6 @@
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
-use uasset::PackageFileSummary;
+use uasset::AssetHeader;
 use walkdir::WalkDir;
 
 #[derive(Debug, StructOpt)]
@@ -12,7 +12,7 @@ struct CommandOptions {
 
 #[derive(Debug, StructOpt)]
 enum Command {
-    /// Show all the fields of the PackageFileSummary for the listed assets
+    /// Show all the fields of the AssetHeader for the listed assets
     Dump {
         /// Assets to dump, directories will be recursively searched for assets
         assets_or_directories: Vec<PathBuf>,
@@ -59,9 +59,11 @@ fn main() {
             assets_or_directories: paths,
         } => {
             for path in recursively_walk(paths) {
+                println!("{}:", path.display());
                 let file = File::open(path).unwrap();
-                let summary = PackageFileSummary::new(&file).unwrap();
-                println!("{:#?}", summary);
+                let header = AssetHeader::new(&file).unwrap();
+                println!("{:#?}", header);
+                println!();
             }
         }
         Command::ListImports {
@@ -71,8 +73,8 @@ fn main() {
             for path in recursively_walk(paths) {
                 println!("{}:", path.display());
                 let file = File::open(path).unwrap();
-                let summary = PackageFileSummary::new(file).unwrap();
-                for import in summary.package_import_iter() {
+                let header = AssetHeader::new(file).unwrap();
+                for import in header.package_import_iter() {
                     if !skip_code_imports || !import.starts_with("/Script/") {
                         println!("  {}", import);
                     }
