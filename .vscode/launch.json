@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=uasset",
-                    "--package=uasset"
+                    "--package=uasset",
+                    "--features=commandline-tool"
                 ],
                 "filter": {
                     "name": "uasset",

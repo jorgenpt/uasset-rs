@@ -42,6 +42,11 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Crate features
+//!
+//! * `commandline-tool` -
+//!   Allows the building of a `uasset` command line tool that can be used to inspect specific assets.
 
 mod enums;
 mod error;
