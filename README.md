@@ -13,7 +13,9 @@ if you have permission. (Specifically, a lot of it was informed by [PackageFileS
 It's designed to work with Unreal Engine assets as old as 4.10 (but might work farther back -- let me know!), and it's intended to be updated to work with the latest engine
 version (at time of writing, that is 4.26).
 
-For details on how to use uasset, please refer to [the documentation on docs.rs][docs-rs].
+## Usage
+
+You can find details on how to use it in your project in [the documentation on docs.rs][docs-rs].
 
 ## License
 
