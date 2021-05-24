@@ -4,16 +4,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
 
-# `uasset`
+# uasset
 
-`uasset` supports parsing `.uasset` files from Unreal Engine in pure Rust, to aid in building tools that reason about Unreal assets without needing to
+uasset supports parsing `.uasset` files from Unreal Engine in pure Rust, to aid in building tools that reason about Unreal assets without needing to
 boot up an entire editor. Most of the format has been gleaned from Unreal Engine's own parsing code, which you can find in [the official UnrealEngine repo][unrealengine]
-if you have permission. (Specifically, a lot of it comes from [PackageFileSummary.h][packagefilesummary-h] and [PackageFileSummary.cpp][packagefilesummary-cpp]).
+if you have permission. (Specifically, a lot of it was informed by [PackageFileSummary.h][packagefilesummary-h] and [PackageFileSummary.cpp][packagefilesummary-cpp]).
 
 It's designed to work with Unreal Engine assets as old as 4.10 (but might work farther back -- let me know!), and it's intended to be updated to work with the latest engine
 version (at time of writing, that is 4.26).
 
-For details on how to use `uasset`, please refer to [the documentation on docs.rs][docs-rs]
+For details on how to use uasset, please refer to [the documentation on docs.rs][docs-rs].
 
 ## License
 
