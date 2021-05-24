@@ -192,27 +192,50 @@ impl<'a> Iterator for ImportIterator<'a> {
 /// load some of the indirectly referenced data (i.e. names, imports, exports).
 #[derive(Debug)]
 pub struct PackageFileSummary {
-    pub file_version_ue4: i32, // TODO: UnrealEngineObjectUE4Version,
+    /// The serialization version used when saving this asset (C++ name: `FileVersionUE4`)
+    pub file_version_ue4: i32, // TODO: Use ObjectVersion enum
+    /// The licensee serialization version used when saving this asset (C++ name: `FileVersionLicenseeUE4`)
     pub file_version_licensee_ue4: i32,
+    /// Full size of the asset header (C++ name: `TotalHeaderSize`)
     pub total_header_size: i32,
+    /// The "Generic Browser" folder name that it lives in (C++ name: `FolderName`)
     pub folder_name: String,
-    pub package_flags: u32, // TODO: PackageFlags
+    /// Package flags like whether this was serialized for the editor (C++ name: `PackagesFlags`)
+    pub package_flags: u32, // TODO: Use PackageFlags enum
+    /// Table of names used by this asset (C++ name: `NameCount` and `NameOffset`)
     pub names: Vec<String>,
+    /// Localization ID for this package (C++ name: `LocalizationId`)
     pub localization_id: Option<String>,
+    /// Number of gatherable text data entries (C++ name: `GatherableTextDataCount`)
     pub gatherable_text_data_count: i32,
+    /// Location on disk of gatherable text data entries (C++ name: GatherableTextDataOffset``)
     gatherable_text_data_offset: i32,
+    /// Number of ExportMap entries (C++ name: `ExportCount`)
     pub export_count: i32,
+    /// Location on disk of the ExportMap data (C++ name: `ExportOffset`)
     export_offset: i32,
+    /// Imports (dependencies) listed by this asset (C++ name: `ImportCount` and `ImportOffset`)
     pub imports: Vec<ClassImport>,
+    /// Location of DependsMap data (C++ name: `DependsOffset`)
     depends_offset: i32,
+    /// Number of soft package references that are listed (C++ name: `SoftPackageReferencesCount`)
     pub string_reference_count: i32,
+    /// Location on disk of the soft package references (C++ name: `SoftPackageReferencesOffset`)
     string_reference_offset: i32,
+    /// Location of SearchableNamesMap data (C++ name: `SearchableNamesOffset`)
     searchable_names_offset: Option<i32>,
+    /// Offset of the thumbnail table (C++ name: `ThumbnailTableOffset`)
     pub thumbnail_table_offset: i32,
+    /// Flags dictating compression settings for this asset (C++ name: `CompressionFlags`)
     pub compression_flags: u32,
+    /// This is a random number in assets created by the shipping build of the editor, and a crc32 of the uppercased filename
+    /// otherwise. Weird. Used to determine if an asset was made "by a modder or by Epic (or licensee)". (C++ name: `PackageSource`)
     pub package_source: u32,
+    /// No longer used
     pub additional_packages_to_cook: Vec<String>,
+    /// No longer used
     pub texture_allocations: Option<i32>,
+    /// Location on disk of the asset registry tag data (C++ name: `AssetRegistryDataOffset`)
     asset_data_offset: i32,
 }
 
@@ -365,8 +388,6 @@ impl PackageFileSummary {
             &compressed_chunk_stream_info,
         )?;
 
-        // This is a random number in assets created by the shipping build of the editor, and a crc32 of the uppercased filename
-        // otherwise. Weird. Used to determine if an asset was made "by a modder or by Epic (or licensee)".
         let package_source = reader.read_le()?;
 
         let additional_packages_to_cook = UnrealArray::<UnrealString>::parse_inline(&mut reader)?;
