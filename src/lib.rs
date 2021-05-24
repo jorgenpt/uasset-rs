@@ -455,7 +455,7 @@ impl AssetHeader {
         })
     }
 
-    /// Attempt to look up `find_name` in the name table serialized in [`PackageFileSummary::names`], will return None
+    /// Attempt to look up `find_name` in the name table serialized in [`AssetHeader::names`], will return None
     /// if the name does not exist. Names are case insensitive.
     pub fn find_name(&self, find_name: &str) -> Option<NameReference> {
         // TODO: Handle `_N` suffixes -> number: Some?
