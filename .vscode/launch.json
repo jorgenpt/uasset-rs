@@ -21,7 +21,8 @@
                 }
             },
             "args": [
-                "assets/UE410/SimpleRefs/SimpleRefsRoot.uasset",
+                "list-imports",
+                "assets/UE410/",
                 "assets/UE426/SimpleRefs/SimpleRefsRoot.uasset"
             ],
             "cwd": "${workspaceFolder}"
