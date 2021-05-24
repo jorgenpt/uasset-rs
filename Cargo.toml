@@ -8,7 +8,7 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/jorgenpt/uasset-rs/"
 repository = "https://github.com/jorgenpt/uasset-rs/"
-version = "0.2.0"
+version = "0.2.1"
 # Don't include the test assets or development files in the crate
 exclude = ["/assets/", "/.github/", "/.vscode/", ".gitignore"]
 
