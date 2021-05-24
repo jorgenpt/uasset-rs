@@ -209,21 +209,21 @@ pub struct AssetHeader {
     /// Number of gatherable text data entries (C++ name: `GatherableTextDataCount`)
     pub gatherable_text_data_count: i32,
     /// Location on disk of gatherable text data entries (C++ name: GatherableTextDataOffset``)
-    gatherable_text_data_offset: i32,
+    pub gatherable_text_data_offset: i32,
     /// Number of ExportMap entries (C++ name: `ExportCount`)
     pub export_count: i32,
     /// Location on disk of the ExportMap data (C++ name: `ExportOffset`)
-    export_offset: i32,
+    pub export_offset: i32,
     /// Imports (dependencies) listed by this asset (C++ name: `ImportCount` and `ImportOffset`)
     pub imports: Vec<ClassImport>,
     /// Location of DependsMap data (C++ name: `DependsOffset`)
-    depends_offset: i32,
+    pub depends_offset: i32,
     /// Number of soft package references that are listed (C++ name: `SoftPackageReferencesCount`)
     pub soft_package_references_count: i32,
     /// Location on disk of the soft package references (C++ name: `SoftPackageReferencesOffset`)
-    soft_package_references_offset: i32,
+    pub soft_package_references_offset: i32,
     /// Location of SearchableNamesMap data (C++ name: `SearchableNamesOffset`)
-    searchable_names_offset: Option<i32>,
+    pub searchable_names_offset: Option<i32>,
     /// Offset of the thumbnail table (C++ name: `ThumbnailTableOffset`)
     pub thumbnail_table_offset: i32,
     /// Flags dictating compression settings for this asset (C++ name: `CompressionFlags`)
@@ -236,7 +236,7 @@ pub struct AssetHeader {
     /// No longer used
     pub texture_allocations: Option<i32>,
     /// Location on disk of the asset registry tag data (C++ name: `AssetRegistryDataOffset`)
-    asset_registry_data_offset: i32,
+    pub asset_registry_data_offset: i32,
 }
 
 impl AssetHeader {
