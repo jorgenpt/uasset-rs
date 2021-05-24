@@ -48,6 +48,63 @@
 //! * `commandline-tool` -
 //!   Allows the building of a `uasset` command line tool that can be used to inspect specific assets.
 
+// BEGIN - Embark standard lints v0.3
+// do not change or add/remove here, but one can add exceptions after this section
+// for more info see: <https://github.com/EmbarkStudios/rust-ecosystem/issues/59>
+#![deny(unsafe_code)]
+#![warn(
+    clippy::all,
+    clippy::await_holding_lock,
+    clippy::dbg_macro,
+    clippy::debug_assert_with_mut_call,
+    clippy::doc_markdown,
+    clippy::empty_enum,
+    clippy::enum_glob_use,
+    clippy::exit,
+    clippy::explicit_into_iter_loop,
+    clippy::filter_map_next,
+    clippy::fn_params_excessive_bools,
+    clippy::if_let_mutex,
+    clippy::imprecise_flops,
+    clippy::inefficient_to_string,
+    clippy::large_types_passed_by_value,
+    clippy::let_unit_value,
+    clippy::linkedlist,
+    clippy::lossy_float_literal,
+    clippy::macro_use_imports,
+    clippy::map_err_ignore,
+    clippy::map_flatten,
+    clippy::map_unwrap_or,
+    clippy::match_on_vec_items,
+    clippy::match_same_arms,
+    clippy::match_wildcard_for_single_variants,
+    clippy::mem_forget,
+    clippy::mismatched_target_os,
+    clippy::needless_borrow,
+    clippy::needless_continue,
+    clippy::option_option,
+    clippy::pub_enum_variant_names,
+    clippy::ref_option_ref,
+    clippy::rest_pat_in_fully_bound_structs,
+    clippy::string_add_assign,
+    clippy::string_add,
+    clippy::string_to_string,
+    clippy::suboptimal_flops,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unnested_or_patterns,
+    clippy::unused_self,
+    clippy::verbose_file_reads,
+    future_incompatible,
+    nonstandard_style,
+    rust_2018_idioms
+)]
+// END - Embark standard lints v0.3
+// crate-specific exceptions:
+#![allow(
+    clippy::let_unit_value, // This one is enabled because we use `let` with unit values to identify fields that aren't parsed.
+)]
+
 mod enums;
 mod error;
 mod serialization;
@@ -67,7 +124,7 @@ use std::{
 pub use enums::{ObjectVersion, PackageFlags};
 pub use error::{Error, InvalidNameIndexError, Result};
 
-/// Magic sequence identifying a UPackage (can also be used to determine endianness)
+/// Magic sequence identifying an unreal asset (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
 /// Iterator over the imported packages in a given [`PackageFileSummary`]
@@ -87,13 +144,13 @@ impl<'a> ImportIterator<'a> {
         // that'll return zero elements.
         match package_name_reference {
             Some(package_name_reference) => Self {
-                package: &package,
+                package,
                 next_index: 0,
                 package_name_reference,
                 core_uobject_package_name_reference,
             },
             None => Self {
-                package: &package,
+                package,
                 next_index: package.imports.len(),
                 package_name_reference: NameReference {
                     index: 0,
@@ -160,7 +217,7 @@ pub struct PackageFileSummary {
 }
 
 impl PackageFileSummary {
-    /// Parse a PackageFileSummary from the given reader, assuming a little endian uasset
+    /// Parse a [`PackageFileSummary`] from the given reader, assuming a little endian uasset
     pub fn new<R>(mut reader: R) -> Result<Self>
     where
         R: Seek + Read,
@@ -383,7 +440,7 @@ impl PackageFileSummary {
     }
 
     /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
-    pub fn package_import_iter(&self) -> ImportIterator {
+    pub fn package_import_iter(&self) -> ImportIterator<'_> {
         ImportIterator::new(self)
     }
 }

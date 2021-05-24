@@ -13,22 +13,22 @@ pub enum Error {
     #[error("asset saved without asset version information")]
     UnversionedAsset,
     #[error("failed to parse data: {0:?}")]
-    ParseError(binread::Error),
-    #[error("failed to seek in stream: {0:?}")]
-    IoError(std::io::Error),
+    ParseFailure(binread::Error),
+    #[error("failed to read or seek stream: {0:?}")]
+    Io(std::io::Error),
     #[error("failed to parse string in asset: {0:?}")]
-    InvalidStringError(std::string::FromUtf8Error),
+    InvalidString(std::string::FromUtf8Error),
 }
 
 impl From<binread::Error> for Error {
     fn from(error: binread::Error) -> Self {
-        Error::ParseError(error)
+        Error::ParseFailure(error)
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
-        Error::IoError(error)
+        Error::Io(error)
     }
 }
 

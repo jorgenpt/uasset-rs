@@ -80,7 +80,7 @@ where
         }
     };
 
-    String::from_utf8(utf8_bytes).map_err(Error::InvalidStringError)
+    String::from_utf8(utf8_bytes).map_err(Error::InvalidString)
 }
 
 #[derive(Debug)]
@@ -211,7 +211,7 @@ where
     }
 }
 
-/// Size of FGuid
+/// Size of `FGuid`
 const GUID_SIZE: u64 = 16;
 pub struct UnrealGuid {}
 
@@ -229,7 +229,7 @@ impl Skippable for UnrealGuid {
     }
 }
 
-/// Size of FCustomVersion, when serializing with ECustomVersionSerializationFormat::Optimized which is the case in
+/// Size of `FCustomVersion`, when serializing with `ECustomVersionSerializationFormat::Optimized` which is the case in
 /// all the file versions we support.
 const CUSTOM_VERSION_SIZE: u64 = 20;
 pub struct UnrealCustomVersion {}
@@ -248,7 +248,7 @@ impl Skippable for UnrealCustomVersion {
     }
 }
 
-/// Size of FGenerationInfo
+/// Size of `FGenerationInfo`
 const GENERATION_INFO_SIZE: u64 = 8;
 pub struct UnrealGenerationInfo {}
 
@@ -266,7 +266,7 @@ impl Skippable for UnrealGenerationInfo {
     }
 }
 
-/// Size of FCompressedChunk
+/// Size of `FCompressedChunk`
 const COMPRESSED_CHUNK_SIZE: u64 = 16;
 pub struct UnrealCompressedChunk {}
 
@@ -284,7 +284,7 @@ impl Skippable for UnrealCompressedChunk {
     }
 }
 
-/// Size of FEngineVersionBase
+/// Size of `FEngineVersionBase`
 const ENGINE_VERSION_BASE_SIZE: u64 = 10;
 
 pub struct UnrealEngineVersion {}
