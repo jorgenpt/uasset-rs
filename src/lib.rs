@@ -117,6 +117,7 @@ use serialization::{
 };
 use std::{
     borrow::Cow,
+    cmp::Ordering,
     io::{Read, Seek},
     num::NonZeroU32,
 };
@@ -138,6 +139,14 @@ pub struct NameReference {
     pub number: Option<NonZeroU32>,
 }
 
+/// A reference to either an import or an export in the asset.
+#[derive(Debug)]
+pub enum ObjectImportOuter {
+    Root,
+    Export { export_index: u32 },
+    Import { import_index: u32 },
+}
+
 /// A reference to an object in another package. Typically accessed through [`AssetHeader::package_import_iter`], but you can also
 /// manually resolve the [`NameReference`]s. (C++ name: `FObjectImport`)
 #[derive(Debug)]
@@ -147,11 +156,26 @@ pub struct ObjectImport {
     /// The name of the class of the object we're importing. (C++ name: `ClassName`)
     pub class_name: NameReference,
     /// Location of the Outer of this object. (C++ name: `OuterIndex`)
-    pub outer_index: i32,
+    outer_index: i32,
     /// The name of the object we are importing. (C++ name: `ObjectName`)
     pub object_name: NameReference,
     /// Package name this import belongs to (C++ name: `PackageName`)
     pub package_name: Option<NameReference>,
+}
+
+impl ObjectImport {
+    /// Determine where the Outer for this import lives
+    pub fn outer(&self) -> ObjectImportOuter {
+        match self.outer_index.cmp(&0) {
+            Ordering::Equal => ObjectImportOuter::Root,
+            Ordering::Greater => ObjectImportOuter::Export {
+                export_index: (self.outer_index - 1) as u32,
+            },
+            Ordering::Less => ObjectImportOuter::Import {
+                import_index: -(self.outer_index + 1) as u32,
+            },
+        }
+    }
 }
 
 /// Iterator over the imported packages in a given [`AssetHeader`]
