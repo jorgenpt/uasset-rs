@@ -111,14 +111,14 @@ mod serialization;
 
 use binread::BinReaderExt;
 use serialization::{
-    ArrayStreamInfo, ClassImport, NameReference, Parseable, SingleItemStreamInfo, Skippable,
-    UnrealArray, UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
-    UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid,
-    UnrealNameEntryWithHash, UnrealString,
+    ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray, UnrealClassImport,
+    UnrealClassImportWithPackageName, UnrealCompressedChunk, UnrealCustomVersion,
+    UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid, UnrealNameEntryWithHash, UnrealString,
 };
 use std::{
     borrow::Cow,
     io::{Read, Seek},
+    num::NonZeroU32,
 };
 
 pub use enums::{ObjectVersion, PackageFlags};
@@ -126,6 +126,33 @@ pub use error::{Error, InvalidNameIndexError, Result};
 
 /// Magic sequence identifying an unreal asset (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
+
+/// A reference to a name in the [`AssetHeader::names`] name table. You can use [`AssetHeader::resolve_name`] to get a human-readable
+/// string from a `NameReference`. It only makes sense to compare `NameReference`s from the same `AssetHeader`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NameReference {
+    /// The index in the name table
+    pub index: u32,
+    /// If present, one greater than an optional suffix on the name (`Some(1)` means the name should have `_0` appended to it).
+    /// The oddness with it being non-zero is based on how this is serialized. You should use
+    pub number: Option<NonZeroU32>,
+}
+
+/// A reference to an object in another package. Typically accessed through [`AssetHeader::package_import_iter`], but you can also
+/// manually resolve the [`NameReference`]s. (C++ name: `FObjectImport`)
+#[derive(Debug)]
+pub struct ClassImport {
+    /// The name of the package that contains the class of the object we're importing. (C++ name: `ClassPackage`)
+    pub class_package: NameReference,
+    /// The name of the class of the object we're importing. (C++ name: `ClassName`)
+    pub class_name: NameReference,
+    /// Location of the Outer of this object. (C++ name: `OuterIndex`)
+    pub outer_index: i32,
+    /// The name of the object we are importing. (C++ name: `ObjectName`)
+    pub object_name: NameReference,
+    /// Package name this import belongs to (C++ name: `PackageName`)
+    pub package_name: Option<NameReference>,
+}
 
 /// Iterator over the imported packages in a given [`AssetHeader`]
 pub struct ImportIterator<'a> {

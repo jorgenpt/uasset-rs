@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
-    Error, Result,
+    ClassImport, Error, NameReference, Result,
 };
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
@@ -310,12 +310,6 @@ impl Skippable for UnrealEngineVersion {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NameReference {
-    pub index: u32,
-    pub number: Option<NonZeroU32>,
-}
-
 #[derive(Debug)]
 pub struct UnrealNameReference {}
 
@@ -337,15 +331,6 @@ impl Parseable for UnrealNameReference {
         let number = NonZeroU32::new(reader.read_le()?);
         Ok(Self::ParsedType { index, number })
     }
-}
-
-#[derive(Debug)]
-pub struct ClassImport {
-    pub class_package: NameReference,
-    pub class_name: NameReference,
-    pub outer_index: i32,
-    pub object_name: NameReference,
-    pub package_name: Option<NameReference>,
 }
 
 #[derive(Debug)]
