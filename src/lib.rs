@@ -112,18 +112,17 @@ impl<'a> Iterator for ImportIterator<'a> {
         while self.next_index < self.package.imports.len() {
             let import = &self.package.imports[self.next_index];
             self.next_index += 1;
-            if import.class_name == self.package_name_reference {
-                if self
+            if import.class_name == self.package_name_reference
+                && self
                     .core_uobject_package_name_reference
                     .map_or(false, |n| import.object_name != n)
-                {
-                    return Some(
-                        self.package
-                            .resolve_name(&import.object_name)
-                            .unwrap()
-                            .to_string(),
-                    );
-                }
+            {
+                return Some(
+                    self.package
+                        .resolve_name(&import.object_name)
+                        .unwrap()
+                        .to_string(),
+                );
             }
         }
 
@@ -384,7 +383,7 @@ impl PackageFileSummary {
     }
 
     /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
-    pub fn package_import_iter<'a>(&'a self) -> ImportIterator<'a> {
+    pub fn package_import_iter(&self) -> ImportIterator {
         ImportIterator::new(self)
     }
 }

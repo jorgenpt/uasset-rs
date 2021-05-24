@@ -40,7 +40,7 @@ fn recursively_walk(paths: Vec<PathBuf>) -> Vec<PathBuf> {
                         entry
                             .file_name()
                             .to_str()
-                            .map_or(false, |name| !name.starts_with("."))
+                            .map_or(false, |name| !name.starts_with('.'))
                     })
                     .filter(|entry| entry.file_type().is_file())
                     .map(|entry| entry.path().to_path_buf())

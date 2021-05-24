@@ -80,7 +80,7 @@ where
         }
     };
 
-    Ok(String::from_utf8(utf8_bytes).map_err(|e| Error::InvalidStringError(e))?)
+    String::from_utf8(utf8_bytes).map_err(Error::InvalidStringError)
 }
 
 #[derive(Debug)]

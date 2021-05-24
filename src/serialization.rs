@@ -53,7 +53,7 @@ where
         R: Seek + Read,
     {
         let stream_info = Self::StreamInfoType::from_current_position(reader)?;
-        Ok(Self::parse_with_info_seekless(reader, &stream_info)?)
+        Self::parse_with_info_seekless(reader, &stream_info)
     }
 
     fn parse_indirect<R>(reader: &mut R) -> Result<Self::ParsedType>
@@ -90,7 +90,7 @@ pub struct SingleItemStreamInfo {
 
 impl StreamInfo for SingleItemStreamInfo {
     fn get_offset(&self) -> u64 {
-        return self.offset;
+        self.offset
     }
 
     fn from_current_position<R>(reader: &mut R) -> Result<Self>
@@ -132,7 +132,7 @@ pub struct ArrayStreamInfo {
 
 impl StreamInfo for ArrayStreamInfo {
     fn get_offset(&self) -> u64 {
-        return self.offset;
+        self.offset
     }
 
     fn from_current_position<R>(reader: &mut R) -> Result<Self>

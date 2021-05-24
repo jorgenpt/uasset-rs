@@ -1,6 +1,6 @@
 /// Maps to `EUnrealEngineObjectUE4Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
 /// the various versions to the core serialized object format.
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum ObjectVersion {
     VER_UE4_OLDEST_LOADABLE_PACKAGE = 214,
@@ -317,6 +317,7 @@ pub enum ObjectVersion {
 /// Maps to `EPackageFlags` in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h. The `UnusedN` entries
 /// exist for completeness, presumably those entries were used in the past.
 #[derive(Debug)]
+#[repr(u32)]
 pub enum PackageFlags {
     None = 0x00000000,
     NewlyCreated = 0x00000001,
