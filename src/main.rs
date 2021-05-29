@@ -1,4 +1,4 @@
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, time};
 use structopt::StructOpt;
 use uasset::AssetHeader;
 use walkdir::WalkDir;
@@ -12,6 +12,11 @@ struct CommandOptions {
 
 #[derive(Debug, StructOpt)]
 enum Command {
+    /// Generating timings for loading all the given assets
+    Benchmark {
+        /// Assets to load, directories will be recursively searched for assets
+        assets_or_directories: Vec<PathBuf>,
+    },
     /// Show all the fields of the AssetHeader for the listed assets
     Dump {
         /// Assets to dump, directories will be recursively searched for assets
@@ -55,24 +60,51 @@ fn recursively_walk(paths: Vec<PathBuf>) -> Vec<PathBuf> {
 fn main() {
     let options = CommandOptions::from_args();
     match options.cmd {
-        Command::Dump {
-            assets_or_directories: paths,
+        Command::Benchmark {
+            assets_or_directories,
         } => {
-            for path in recursively_walk(paths) {
-                println!("{}:", path.display());
-                let file = File::open(path).unwrap();
+            let start = time::Instant::now();
+            let asset_paths = recursively_walk(assets_or_directories);
+            println!("Scanning directories took {:?}", start.elapsed());
+
+            let load_start = time::Instant::now();
+            let num_assets = asset_paths.len();
+            let num_imports: usize = asset_paths
+                .into_iter()
+                .map(|asset_path| {
+                    let file = File::open(asset_path).unwrap();
+                    let header = AssetHeader::new(&file).unwrap();
+                    header.imports.len()
+                })
+                .sum();
+            let load_duration = load_start.elapsed();
+
+            println!(
+                "Loading {} assets with {} imports took {:?}",
+                num_assets, num_imports, load_duration,
+            );
+            println!("Total execution took {:?}", start.elapsed());
+        }
+        Command::Dump {
+            assets_or_directories,
+        } => {
+            let asset_paths = recursively_walk(assets_or_directories);
+            for asset_path in asset_paths {
+                println!("{}:", asset_path.display());
+                let file = File::open(asset_path).unwrap();
                 let header = AssetHeader::new(&file).unwrap();
                 println!("{:#?}", header);
                 println!();
             }
         }
         Command::ListImports {
-            assets_or_directories: paths,
+            assets_or_directories,
             skip_code_imports,
         } => {
-            for path in recursively_walk(paths) {
-                println!("{}:", path.display());
-                let file = File::open(path).unwrap();
+            let asset_paths = recursively_walk(assets_or_directories);
+            for asset_path in asset_paths {
+                println!("{}:", asset_path.display());
+                let file = File::open(asset_path).unwrap();
                 let header = AssetHeader::new(file).unwrap();
                 for import in header.package_import_iter() {
                     if !skip_code_imports || !import.starts_with("/Script/") {
