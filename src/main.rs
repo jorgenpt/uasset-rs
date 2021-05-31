@@ -3,6 +3,7 @@ use log::{error, trace};
 use simplelog::{Config, TermLogger, TerminalMode};
 use std::{
     fs::File,
+    io::BufReader,
     path::{Path, PathBuf},
     time,
 };
@@ -72,7 +73,7 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
 fn try_parse<T: FnOnce(AssetHeader)>(asset_path: &Path, callback: T) -> bool {
     trace!("reading {}", asset_path.display());
     match File::open(asset_path) {
-        Ok(file) => match AssetHeader::new(file) {
+        Ok(file) => match AssetHeader::new(BufReader::new(file)) {
             Ok(header) => {
                 callback(header);
                 true
