@@ -105,6 +105,7 @@
     clippy::let_unit_value, // This one is enabled because we use `let` with unit values to identify fields that aren't parsed.
 )]
 
+mod archive;
 mod enums;
 mod error;
 mod serialization;
@@ -122,11 +123,9 @@ use std::{
     num::NonZeroU32,
 };
 
+pub use archive::Archive;
 pub use enums::{ObjectVersion, PackageFlags};
 pub use error::{Error, InvalidNameIndexError, Result};
-
-/// Magic sequence identifying an unreal asset (can also be used to determine endianness)
-const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
 /// A reference to a name in the [`AssetHeader::names`] name table. You can use [`AssetHeader::resolve_name`] to get a human-readable
 /// string from a `NameReference`. It only makes sense to compare `NameReference`s from the same `AssetHeader`.
@@ -179,15 +178,15 @@ impl ObjectImport {
 }
 
 /// Iterator over the imported packages in a given [`AssetHeader`]
-pub struct ImportIterator<'a> {
-    package: &'a AssetHeader,
+pub struct ImportIterator<'a, R> {
+    package: &'a AssetHeader<R>,
     next_index: usize,
     package_name_reference: NameReference,
     core_uobject_package_name_reference: Option<NameReference>,
 }
 
-impl<'a> ImportIterator<'a> {
-    pub fn new(package: &'a AssetHeader) -> Self {
+impl<'a, R> ImportIterator<'a, R> {
+    pub fn new(package: &'a AssetHeader<R>) -> Self {
         let package_name_reference = package.find_name("Package");
         let core_uobject_package_name_reference = package.find_name("/Script/CoreUObject");
 
@@ -213,7 +212,7 @@ impl<'a> ImportIterator<'a> {
     }
 }
 
-impl<'a> Iterator for ImportIterator<'a> {
+impl<'a, R> Iterator for ImportIterator<'a, R> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -242,11 +241,8 @@ impl<'a> Iterator for ImportIterator<'a> {
 /// This roughly maps to `FPackageFileSummary` in Engine/Source/Runtime/CoreUObject/Public/UObject/PackageFileSummary.h, except we
 /// load some of the indirectly referenced data (i.e. names, imports, exports).
 #[derive(Debug)]
-pub struct AssetHeader {
-    /// The serialization version used when saving this asset (C++ name: `FileVersionUE4`)
-    pub file_version: i32, // TODO: Use ObjectVersion enum
-    /// The licensee serialization version used when saving this asset (C++ name: `FileVersionLicenseeUE4`)
-    pub file_licensee_version: i32,
+pub struct AssetHeader<R> {
+    pub archive: Archive<R>,
     /// Full size of the asset header (C++ name: `TotalHeaderSize`)
     pub total_header_size: i32,
     /// The "Generic Browser" folder name that it lives in (C++ name: `FolderName`)
@@ -290,172 +286,155 @@ pub struct AssetHeader {
     pub asset_registry_data_offset: i32,
 }
 
-impl AssetHeader {
+impl<R> AssetHeader<R>
+where
+    R: Seek + Read,
+{
     /// Parse an [`AssetHeader`] from the given reader, assuming a little endian uasset
-    pub fn new<R>(mut reader: R) -> Result<Self>
-    where
-        R: Seek + Read,
-    {
-        let magic: u32 = reader.read_le()?;
-        if magic != PACKAGE_FILE_MAGIC {
-            return Err(Error::InvalidFile);
-        }
-
-        let legacy_version: i32 = reader.read_le()?;
-        if legacy_version != -6 && legacy_version != -7 {
-            return Err(Error::UnsupportedVersion(legacy_version));
-        }
-
-        let _legacy_ue3_version: i32 = reader.read_le()?;
-
-        let file_version = reader.read_le()?;
-        let file_licensee_version = reader.read_le()?;
-        if file_version == 0 && file_licensee_version == 0 {
-            return Err(Error::UnversionedAsset);
-        }
+    pub fn new(reader: R) -> Result<Self> {
+        let mut archive = Archive::new(reader)?;
 
         // Parse and seek past `CustomVersionContainer`
-        let num_custom_versions: i32 = reader.read_le()?;
+        let num_custom_versions: i32 = archive.read_le()?;
         let custom_versions_stream_info = ArrayStreamInfo {
-            offset: reader.stream_position()?,
+            offset: archive.stream_position()?,
             count: num_custom_versions as u64,
         };
         let _custom_versions = UnrealArray::<UnrealCustomVersion>::seek_past_with_info(
-            &mut reader,
+            &mut archive,
             &custom_versions_stream_info,
         )?;
 
-        let total_header_size = reader.read_le()?;
+        let total_header_size = archive.read_le()?;
 
-        let folder_name = UnrealString::parse_inline(&mut reader)?;
+        let folder_name = UnrealString::parse_inline(&mut archive)?;
 
-        let package_flags = reader.read_le()?;
+        let package_flags = archive.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
 
-        let names = if file_version >= ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED as i32 {
-            UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut reader)?
+        let names = if archive.serialized_with(ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED) {
+            UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut archive)?
         } else {
-            UnrealArray::<UnrealString>::parse_indirect(&mut reader)?
+            UnrealArray::<UnrealString>::parse_indirect(&mut archive)?
         };
 
         let supports_localization_id =
-            file_version >= ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID);
         let localization_id = if supports_localization_id && has_editor_only_data {
-            Some(UnrealString::parse_inline(&mut reader)?)
+            Some(UnrealString::parse_inline(&mut archive)?)
         } else {
             None
         };
 
         let has_gatherable_text_data =
-            file_version >= ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_SERIALIZE_TEXT_IN_PACKAGES);
         let (gatherable_text_data_count, gatherable_text_data_offset) = if has_gatherable_text_data
         {
-            (reader.read_le()?, reader.read_le()?)
+            (archive.read_le()?, archive.read_le()?)
         } else {
             (0, 0)
         };
 
-        let export_count = reader.read_le()?;
-        let export_offset = reader.read_le()?;
+        let export_count = archive.read_le()?;
+        let export_offset = archive.read_le()?;
 
-        let imports = if file_version >= ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32
+        let imports = if archive.serialized_with(ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT)
             && has_editor_only_data
         {
-            UnrealArray::<UnrealClassImportWithPackageName>::parse_indirect(&mut reader)?
+            UnrealArray::<UnrealClassImportWithPackageName>::parse_indirect(&mut archive)?
         } else {
-            UnrealArray::<UnrealClassImport>::parse_indirect(&mut reader)?
+            UnrealArray::<UnrealClassImport>::parse_indirect(&mut archive)?
         };
 
-        let depends_offset = reader.read_le()?;
+        let depends_offset = archive.read_le()?;
 
         let has_string_asset_references_map =
-            file_version >= ObjectVersion::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_ADD_STRING_ASSET_REFERENCES_MAP);
         let (soft_package_references_count, soft_package_references_offset) =
             if has_string_asset_references_map {
-                (reader.read_le()?, reader.read_le()?)
+                (archive.read_le()?, archive.read_le()?)
             } else {
                 (0, 0)
             };
 
         let has_searchable_names =
-            file_version >= ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES);
         let searchable_names_offset = if has_searchable_names {
-            Some(reader.read_le()?)
+            Some(archive.read_le()?)
         } else {
             None
         };
 
-        let thumbnail_table_offset = reader.read_le()?;
+        let thumbnail_table_offset = archive.read_le()?;
 
-        let _guid = UnrealGuid::seek_past(&mut reader)?;
+        let _guid = UnrealGuid::seek_past(&mut archive)?;
         let supports_package_owner =
-            file_version >= ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER);
         if supports_package_owner && has_editor_only_data {
-            let _persistent_guid = UnrealGuid::seek_past(&mut reader)?;
-            let supports_non_outer_package_import =
-                file_version < ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT as i32;
-            if supports_non_outer_package_import {
-                let _owner_persistent_guid = UnrealGuid::seek_past(&mut reader)?;
+            let _persistent_guid = UnrealGuid::seek_past(&mut archive)?;
+            let before_non_outer_package_import =
+                archive.serialized_without(ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT);
+            if before_non_outer_package_import {
+                let _owner_persistent_guid = UnrealGuid::seek_past(&mut archive)?;
             }
         }
 
-        let num_generations: i32 = reader.read_le()?;
+        let num_generations: i32 = archive.read_le()?;
         let generations_stream_info = ArrayStreamInfo {
-            offset: reader.stream_position()?,
+            offset: archive.stream_position()?,
             count: num_generations as u64,
         };
         let _generations = UnrealArray::<UnrealGenerationInfo>::seek_past_with_info(
-            &mut reader,
+            &mut archive,
             &generations_stream_info,
         )?;
 
         let has_engine_version_object =
-            file_version >= ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT as i32;
+            archive.serialized_with(ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT);
         if has_engine_version_object {
-            let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
+            let details = &SingleItemStreamInfo::from_stream(&mut archive)?;
             let _saved_by_engine_version =
-                UnrealEngineVersion::seek_past_with_info(&mut reader, details)?;
+                UnrealEngineVersion::seek_past_with_info(&mut archive, details)?;
         } else {
-            let _engine_changelist: u32 = reader.read_le()?;
+            let _engine_changelist: u32 = archive.read_le()?;
             // 4.26 converts this using FEngineVersion::Set(4, 0, 0, EngineChangelist, TEXT(""));
         }
 
-        let has_compatible_with_engine_version = file_version
-            >= ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION as i32;
+        let has_compatible_with_engine_version = archive
+            .serialized_with(ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION);
         if has_compatible_with_engine_version {
-            let details = &SingleItemStreamInfo::from_stream(&mut reader)?;
+            let details = &SingleItemStreamInfo::from_stream(&mut archive)?;
             let _compatible_with_engine_version =
-                UnrealEngineVersion::seek_past_with_info(&mut reader, details)?;
+                UnrealEngineVersion::seek_past_with_info(&mut archive, details)?;
         }
 
-        let compression_flags = reader.read_le()?;
+        let compression_flags = archive.read_le()?;
 
         // The engine will refuse to load any package with compressed chunks, but it doesn't hurt for us to just skip past them.
-        let num_compressed_chunks: i32 = reader.read_le()?;
+        let num_compressed_chunks: i32 = archive.read_le()?;
         let compressed_chunk_stream_info = ArrayStreamInfo {
-            offset: reader.stream_position()?,
+            offset: archive.stream_position()?,
             count: num_compressed_chunks as u64,
         };
         let _compressed_chunks = UnrealArray::<UnrealCompressedChunk>::seek_past_with_info(
-            &mut reader,
+            &mut archive,
             &compressed_chunk_stream_info,
         )?;
 
-        let package_source = reader.read_le()?;
+        let package_source = archive.read_le()?;
 
-        let additional_packages_to_cook = UnrealArray::<UnrealString>::parse_inline(&mut reader)?;
+        let additional_packages_to_cook = UnrealArray::<UnrealString>::parse_inline(&mut archive)?;
 
-        let texture_allocations = if legacy_version > -7 {
-            Some(reader.read_le()?)
+        let texture_allocations = if archive.legacy_version > -7 {
+            Some(archive.read_le()?)
         } else {
             None
         };
 
-        let asset_registry_data_offset = reader.read_le()?;
+        let asset_registry_data_offset = archive.read_le()?;
 
         Ok(Self {
-            file_version,
-            file_licensee_version,
+            archive,
             total_header_size,
             folder_name,
             package_flags,
@@ -478,7 +457,9 @@ impl AssetHeader {
             asset_registry_data_offset,
         })
     }
+}
 
+impl<R> AssetHeader<R> {
     /// Attempt to look up `find_name` in the name table serialized in [`AssetHeader::names`], will return None
     /// if the name does not exist. Names are case insensitive.
     pub fn find_name(&self, find_name: &str) -> Option<NameReference> {
@@ -514,7 +495,7 @@ impl AssetHeader {
     }
 
     /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
-    pub fn package_import_iter(&self) -> ImportIterator<'_> {
+    pub fn package_import_iter(&self) -> ImportIterator<'_, R> {
         ImportIterator::new(self)
     }
 }

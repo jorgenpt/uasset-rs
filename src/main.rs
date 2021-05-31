@@ -70,7 +70,7 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
         .collect()
 }
 
-fn try_parse<T: FnOnce(AssetHeader)>(asset_path: &Path, callback: T) -> bool {
+fn try_parse<T: FnOnce(AssetHeader<BufReader<File>>)>(asset_path: &Path, callback: T) -> bool {
     trace!("reading {}", asset_path.display());
     match File::open(asset_path) {
         Ok(file) => match AssetHeader::new(BufReader::new(file)) {
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
                 .into_iter()
                 .map(|asset_path| {
                     let mut num_imports = 0;
-                    let reader = |header: AssetHeader| {
+                    let reader = |header: AssetHeader<_>| {
                         trace!("found {} imports", header.imports.len());
                         num_imports = header.imports.len();
                     };
