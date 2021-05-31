@@ -11,6 +11,8 @@ use structopt_flags::LogLevel;
 use uasset::AssetHeader;
 use walkdir::WalkDir;
 
+const UASSET_EXTENSIONS: [&str; 2] = [".uasset", ".umap"];
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "uasset", about = "A program to display various uasset data")]
 struct CommandOptions {
@@ -42,7 +44,7 @@ enum Command {
     },
 }
 
-fn recursively_walk(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     paths
         .into_iter()
         .flat_map(|path| {
@@ -52,10 +54,10 @@ fn recursively_walk(paths: Vec<PathBuf>) -> Vec<PathBuf> {
                     .into_iter()
                     .filter_map(|entry| entry.ok())
                     .filter(|entry| {
-                        entry
-                            .file_name()
-                            .to_str()
-                            .map_or(false, |name| !name.starts_with('.'))
+                        entry.file_name().to_str().map_or(false, |name| {
+                            !name.starts_with('.')
+                                && UASSET_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
+                        })
                     })
                     .filter(|entry| entry.file_type().is_file())
                     .map(|entry| entry.path().to_path_buf())
@@ -100,7 +102,7 @@ fn main() -> Result<()> {
             assets_or_directories,
         } => {
             let start = time::Instant::now();
-            let asset_paths = recursively_walk(assets_or_directories);
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
             println!("Scanning directories took {:?}", start.elapsed());
 
             let load_start = time::Instant::now();
@@ -134,7 +136,7 @@ fn main() -> Result<()> {
         Command::Dump {
             assets_or_directories,
         } => {
-            let asset_paths = recursively_walk(assets_or_directories);
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
             for asset_path in asset_paths {
                 try_parse(&asset_path, |header| {
                     println!("{}:", asset_path.display());
@@ -147,7 +149,7 @@ fn main() -> Result<()> {
             assets_or_directories,
             skip_code_imports,
         } => {
-            let asset_paths = recursively_walk(assets_or_directories);
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
             for asset_path in asset_paths {
                 try_parse(&asset_path, |header| {
                     println!("{}:", asset_path.display());
