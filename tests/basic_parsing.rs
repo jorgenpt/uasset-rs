@@ -15,7 +15,10 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
     assert!(header.is_ok());
     let header = header.unwrap();
 
-    assert_eq!(header.file_version, version_info.object_version as i32);
+    assert_eq!(
+        header.archive.file_version,
+        version_info.object_version as i32
+    );
 
     assert!(
         header
@@ -42,10 +45,10 @@ fn upgrading_asset(#[case] version_info: UnrealVersionInfo) {
     let new_header = AssetHeader::new(File::open(new_simple_refs_root).unwrap()).unwrap();
 
     assert!(
-        new_header.file_version >= old_header.file_version,
+        new_header.archive.file_version >= old_header.archive.file_version,
         "new_header.file_version_ue4 = {}, old_header.file_version_ue4 = {}",
-        new_header.file_version,
-        old_header.file_version
+        new_header.archive.file_version,
+        old_header.archive.file_version
     );
     assert_eq!(new_header.package_source, old_header.package_source);
 }
