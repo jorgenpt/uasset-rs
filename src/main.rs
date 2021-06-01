@@ -15,7 +15,10 @@ use walkdir::WalkDir;
 const UASSET_EXTENSIONS: [&str; 2] = [".uasset", ".umap"];
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "uasset", about = "A program to display various uasset data")]
+#[structopt(
+    name = "uasset",
+    about = "Parse and display info about files in the Unreal Engine uasset format"
+)]
 struct CommandOptions {
     #[structopt(flatten)]
     verbose: structopt_flags::QuietVerbose,
