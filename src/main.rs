@@ -15,11 +15,16 @@ use tempfile::TempDir;
 use uasset::AssetHeader;
 use walkdir::WalkDir;
 
-const UASSET_EXTENSIONS: [&str; 2] = [".uasset", ".umap"];
+const UASSET_EXTENSIONS: [&str; 2] = ["uasset", "umap"];
 
 fn is_uasset<P: AsRef<Path>>(path: P) -> bool {
     let path = path.as_ref();
-    return UASSET_EXTENSIONS.iter().any(|ext| path.ends_with(ext));
+    if let Some(extension) = path.extension() {
+        let extension = extension.to_string_lossy();
+        UASSET_EXTENSIONS.contains(&extension.as_ref())
+    } else {
+        false
+    }
 }
 
 #[derive(Debug, PartialEq)]
