@@ -289,28 +289,62 @@ impl Skippable for UnrealCompressedChunk {
     }
 }
 
-/// Size of `FEngineVersionBase`
-const ENGINE_VERSION_BASE_SIZE: u64 = 10;
+#[derive(Clone, Debug)]
+pub struct UnrealEngineVersion {
+    pub major: u16,
+    pub minor: u16,
+    pub patch: u16,
+    pub changelist: u32,
+    pub branch_name: String,
+}
 
-pub struct UnrealEngineVersion {}
+impl UnrealEngineVersion {
+    pub fn empty() -> Self {
+        Self {
+            major: 0,
+            minor: 0,
+            patch: 0,
+            changelist: 0,
+            branch_name: String::new(),
+        }
+    }
+
+    pub fn from_changelist(changelist: u32) -> Self {
+        Self {
+            major: 4,
+            changelist,
+            ..Self::empty()
+        }
+    }
+}
 
 impl Deferrable for UnrealEngineVersion {
     type StreamInfoType = SingleItemStreamInfo;
 }
 
-impl Skippable for UnrealEngineVersion {
-    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+impl Parseable for UnrealEngineVersion {
+    type ParsedType = UnrealEngineVersion;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _stream_info: &Self::StreamInfoType,
+    ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
-        // This is the BranchName in FEngineVersion, the only field on top of FEngineVersionBase
-        let _engine_version_branch_name = UnrealString::seek_past_with_info(
-            reader,
-            &SingleItemStreamInfo {
-                offset: stream_info.offset + ENGINE_VERSION_BASE_SIZE,
-            },
-        )?;
-        Ok(())
+        let major = reader.read_le()?;
+        let minor = reader.read_le()?;
+        let patch = reader.read_le()?;
+        let changelist = reader.read_le()?;
+        let branch_name = UnrealString::parse_inline(reader)?;
+
+        Ok(Self::ParsedType {
+            major,
+            minor,
+            patch,
+            changelist,
+            branch_name,
+        })
     }
 }
 

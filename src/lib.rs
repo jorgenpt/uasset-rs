@@ -112,7 +112,7 @@ mod serialization;
 
 use binread::BinReaderExt;
 use serialization::{
-    ArrayStreamInfo, Parseable, SingleItemStreamInfo, Skippable, UnrealArray, UnrealClassImport,
+    ArrayStreamInfo, Parseable, Skippable, UnrealArray, UnrealClassImport,
     UnrealClassImportWithPackageName, UnrealCompressedChunk, UnrealCustomVersion,
     UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid, UnrealNameEntryWithHash, UnrealString,
 };
@@ -273,6 +273,10 @@ pub struct AssetHeader<R> {
     pub searchable_names_offset: Option<i32>,
     /// Offset of the thumbnail table (C++ name: `ThumbnailTableOffset`)
     pub thumbnail_table_offset: i32,
+    /// Information about the engine version the asset was saved with (C++ name: `SavedByEngineVersion`)
+    pub engine_version: UnrealEngineVersion,
+    /// Information about the engine version the asset is compatible with (for hotfix support) (C++ name: `CompatibleWithEngineVersion`)
+    pub compatible_with_engine_version: UnrealEngineVersion,
     /// Flags dictating compression settings for this asset (C++ name: `CompressionFlags`)
     pub compression_flags: u32,
     /// This is a random number in assets created by the shipping build of the editor, and a crc32 of the uppercased filename
@@ -391,22 +395,23 @@ where
 
         let has_engine_version_object =
             archive.serialized_with(ObjectVersion::VER_UE4_ENGINE_VERSION_OBJECT);
-        if has_engine_version_object {
-            let details = &SingleItemStreamInfo::from_stream(&mut archive)?;
-            let _saved_by_engine_version =
-                UnrealEngineVersion::seek_past_with_info(&mut archive, details)?;
+        let engine_version = if has_engine_version_object {
+            UnrealEngineVersion::parse_inline(&mut archive)?
         } else {
-            let _engine_changelist: u32 = archive.read_le()?;
+            let engine_changelist: u32 = archive.read_le()?;
             // 4.26 converts this using FEngineVersion::Set(4, 0, 0, EngineChangelist, TEXT(""));
-        }
+            UnrealEngineVersion::from_changelist(engine_changelist)
+        };
 
         let has_compatible_with_engine_version = archive
             .serialized_with(ObjectVersion::VER_UE4_PACKAGE_SUMMARY_HAS_COMPATIBLE_ENGINE_VERSION);
-        if has_compatible_with_engine_version {
-            let details = &SingleItemStreamInfo::from_stream(&mut archive)?;
-            let _compatible_with_engine_version =
-                UnrealEngineVersion::seek_past_with_info(&mut archive, details)?;
-        }
+        let compatible_with_engine_version = if has_compatible_with_engine_version {
+            UnrealEngineVersion::parse_inline(&mut archive)?
+            // TODO: Fixup `FixCorruptEngineVersion` for VER_UE4_CORRECT_LICENSEE_FLAG ("The move of EpicInternal.txt in CL 12740027 broke checks for non-licensee builds in UGS.")
+        } else {
+            // 4.27 just copies the engine version here
+            engine_version.clone()
+        };
 
         let compression_flags = archive.read_le()?;
 
@@ -450,6 +455,8 @@ where
             soft_package_references_offset,
             searchable_names_offset,
             thumbnail_table_offset,
+            engine_version,
+            compatible_with_engine_version,
             compression_flags,
             package_source,
             additional_packages_to_cook,
