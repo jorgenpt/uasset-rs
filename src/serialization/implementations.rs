@@ -295,16 +295,21 @@ pub struct UnrealEngineVersion {
     pub minor: u16,
     pub patch: u16,
     pub changelist: u32,
+    pub is_licensee_version: bool,
     pub branch_name: String,
 }
 
 impl UnrealEngineVersion {
+    pub const LICENSEE_BIT_MASK: u32 = 0x80000000;
+    pub const CHANGELIST_MASK: u32 = 0x7fffffff;
+
     pub fn empty() -> Self {
         Self {
             major: 0,
             minor: 0,
             patch: 0,
             changelist: 0,
+            is_licensee_version: false,
             branch_name: String::new(),
         }
     }
@@ -312,13 +317,14 @@ impl UnrealEngineVersion {
     pub fn from_changelist(changelist: u32) -> Self {
         Self {
             major: 4,
-            changelist,
+            changelist: changelist & Self::CHANGELIST_MASK,
+            is_licensee_version: (changelist & Self::LICENSEE_BIT_MASK) != 0,
             ..Self::empty()
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.changelist == 0
+        self.changelist == 0 && !self.is_licensee_version
     }
 }
 
@@ -346,8 +352,8 @@ impl Parseable for UnrealEngineVersion {
             major,
             minor,
             patch,
-            changelist,
             branch_name,
+            ..Self::from_changelist(changelist)
         })
     }
 }
