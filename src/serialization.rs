@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::Result;
 use binread::BinReaderExt;
 use std::io::{Read, Seek, SeekFrom};
