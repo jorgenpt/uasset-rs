@@ -231,8 +231,11 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
 
         if let Some(path) = modified_file {
             if !is_uasset(&path) {
+                trace!("ignoring modified file {}, not an uasset", path);
                 continue;
             }
+
+            trace!("downloading file {}", record.depot_file);
 
             let path = PathBuf::from(&path[2..]);
             let local_path = asset_dir.path().join(path);
@@ -256,6 +259,8 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
             );
 
             asset_paths.push(local_path);
+        } else {
+            trace!("ignoring file {} with non-modification action {:?}", record.depot_file, record.action);
         }
     }
 
