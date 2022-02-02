@@ -220,23 +220,22 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
     for line in stdout.lines() {
         let record: PerforceOpenedRecord = serde_json::from_str(line)?;
         let modified_file = match record.action {
-            PerforceAction::Add => Some(record.client_file),
-            PerforceAction::Edit => Some(record.client_file),
-            PerforceAction::Branch => Some(record.client_file),
-            PerforceAction::MoveAdd => Some(record.client_file),
-            PerforceAction::Integrate => Some(record.client_file),
-            PerforceAction::Import => Some(record.client_file),
+            PerforceAction::Add => Some(&record.depot_file),
+            PerforceAction::Edit => Some(&record.depot_file),
+            PerforceAction::Branch => Some(&record.depot_file),
+            PerforceAction::MoveAdd => Some(&record.depot_file),
+            PerforceAction::Integrate => Some(&record.depot_file),
+            PerforceAction::Import => Some(&record.depot_file),
             _ => None,
         };
+
         if let Some(path) = modified_file {
             if !is_uasset(&path) {
                 continue;
             }
 
-            let client_prefix = format!("//{}/", record.client);
-            let path = PathBuf::from(path);
-            let stripped_file = path.strip_prefix(client_prefix)?;
-            let local_path = asset_dir.path().join(stripped_file);
+            let path = PathBuf::from(&path[2..]);
+            let local_path = asset_dir.path().join(path);
             if let Some(parent_path) = local_path.parent() {
                 std::fs::create_dir_all(parent_path)?;
             }
