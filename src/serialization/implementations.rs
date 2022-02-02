@@ -33,54 +33,58 @@ fn parse_string<R>(reader: &mut R) -> Result<String>
 where
     R: Seek + Read,
 {
-    let utf8_bytes = {
-        let length: i32 = reader.read_le()?;
-        if length < 0 {
-            // Omit the trailing \0
-            let length = -length as usize - 1;
-            // Each UCS-2 code point can map to at most 3 UTF-8 bytes (it only encodes the basic multilingual plane of UTF8).
-            let mut utf8_bytes = Vec::with_capacity(3 * length);
-            // We could use as_mut_ptr + ptr::write + from_raw_parts_in, since we know that we'll never go out of bounds for the capacity we've reserved.
-            for _ in 0..length {
-                let ch: u16 = reader.read_le()?;
-                if (0x000..0x0080).contains(&ch) {
-                    utf8_bytes.push(ch as u8);
-                } else if (0x0080..0x0800).contains(&ch) {
-                    let first = 0b1100_0000 + ch.get_bits(6..11) as u8;
-                    let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+    let length: i32 = reader.read_le()?;
+    if length != 0 {
+        let utf8_bytes = {
+            if length < 0 {
+                // Omit the trailing \0
+                let length = -length as usize - 1;
+                // Each UCS-2 code point can map to at most 3 UTF-8 bytes (it only encodes the basic multilingual plane of UTF8).
+                let mut utf8_bytes = Vec::with_capacity(3 * length);
+                // We could use as_mut_ptr + ptr::write + from_raw_parts_in, since we know that we'll never go out of bounds for the capacity we've reserved.
+                for _ in 0..length {
+                    let ch: u16 = reader.read_le()?;
+                    if (0x000..0x0080).contains(&ch) {
+                        utf8_bytes.push(ch as u8);
+                    } else if (0x0080..0x0800).contains(&ch) {
+                        let first = 0b1100_0000 + ch.get_bits(6..11) as u8;
+                        let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
 
-                    utf8_bytes.push(first);
-                    utf8_bytes.push(last);
-                } else {
-                    let first = 0b1110_0000 + ch.get_bits(12..16) as u8;
-                    let mid = 0b1000_0000 + ch.get_bits(6..12) as u8;
-                    let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
+                        utf8_bytes.push(first);
+                        utf8_bytes.push(last);
+                    } else {
+                        let first = 0b1110_0000 + ch.get_bits(12..16) as u8;
+                        let mid = 0b1000_0000 + ch.get_bits(6..12) as u8;
+                        let last = 0b1000_0000 + ch.get_bits(0..6) as u8;
 
-                    utf8_bytes.push(first);
-                    utf8_bytes.push(mid);
-                    utf8_bytes.push(last);
+                        utf8_bytes.push(first);
+                        utf8_bytes.push(mid);
+                        utf8_bytes.push(last);
+                    }
                 }
+
+                // Skip the trailing \0
+                reader.seek(SeekFrom::Current(2))?;
+
+                utf8_bytes.shrink_to_fit();
+                utf8_bytes
+            } else {
+                // Omit the trailing \0
+                let length = length - 1;
+                let mut utf8_bytes = Vec::new();
+                utf8_bytes.resize(length as usize, 0u8);
+
+                reader.read_exact(&mut utf8_bytes)?;
+                // Skip the trailing \0
+                reader.seek(SeekFrom::Current(1))?;
+
+                utf8_bytes
             }
-
-            // Skip the trailing \0
-            reader.seek(SeekFrom::Current(2))?;
-
-            utf8_bytes.shrink_to_fit();
-            utf8_bytes
-        } else {
-            // Omit the trailing \0
-            let length = length - 1;
-            let mut utf8_bytes = Vec::new();
-            utf8_bytes.resize(length as usize, 0u8);
-            reader.read_exact(&mut utf8_bytes)?;
-            // Skip the trailing \0
-            reader.seek(SeekFrom::Current(1))?;
-
-            utf8_bytes
-        }
-    };
-
-    String::from_utf8(utf8_bytes).map_err(Error::InvalidString)
+        };
+        String::from_utf8(utf8_bytes).map_err(Error::InvalidString)
+    } else {
+        Ok(String::new())
+    }
 }
 
 #[derive(Debug)]
