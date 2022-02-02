@@ -182,18 +182,14 @@ impl<'de> Deserialize<'de> for PerforceAction {
 #[derive(Deserialize)]
 #[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
-struct PerforceOpenedRecord {
+struct PerforceFilesRecord {
     pub action: PerforceAction,
     pub change: String,
-    pub client: String,
-    pub client_file: String,
     pub depot_file: String,
-    pub moved_file: Option<String>,
-    pub have_rev: String,
     pub rev: String,
+    pub time: String,
     #[serde(rename = "type")]
     pub file_type: String,
-    pub user: String,
 }
 
 fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Vec<PathBuf>)> {
@@ -202,23 +198,22 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
 
     let command = std::process::Command::new("p4")
         .args(["-z", "tag", "-Mj"])
-        .arg("opened")
-        .arg("-a")
-        .args(["-c", &format!("{}", changelist)])
+        .arg("files")
+        .arg(&format!("@={}", changelist))
         .output()?;
 
     let stdout = std::str::from_utf8(&command.stdout)?;
     if !command.status.success() {
         let stderr = std::str::from_utf8(&command.stderr)?;
         bail!(
-            "Failed to run `p4 opened`:\nstdout: {}\nstderr: {}",
+            "Failed to run `p4 files`:\nstdout: {}\nstderr: {}",
             stdout,
             stderr
         );
     }
 
     for line in stdout.lines() {
-        let record: PerforceOpenedRecord = serde_json::from_str(line)?;
+        let record: PerforceFilesRecord = serde_json::from_str(line)?;
         let modified_file = match record.action {
             PerforceAction::Add => Some(&record.depot_file),
             PerforceAction::Edit => Some(&record.depot_file),
