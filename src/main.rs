@@ -1,18 +1,26 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use log::{error, trace};
+use serde::{Deserialize, Deserializer};
 use simplelog::{Config, TermLogger, TerminalMode};
 use std::{
     fs::File,
     io::BufReader,
+    num::NonZeroU32,
     path::{Path, PathBuf},
     time,
 };
 use structopt::StructOpt;
 use structopt_flags::LogLevel;
+use tempfile::TempDir;
 use uasset::AssetHeader;
 use walkdir::WalkDir;
 
 const UASSET_EXTENSIONS: [&str; 2] = [".uasset", ".umap"];
+
+fn is_uasset<P: AsRef<Path>>(path: P) -> bool {
+    let path = path.as_ref();
+    return UASSET_EXTENSIONS.iter().any(|ext| path.ends_with(ext));
+}
 
 #[derive(Debug, PartialEq)]
 enum Validation {
@@ -84,6 +92,9 @@ enum Command {
     Validate {
         /// Assets to validate, directories will be recursively searched for assets
         assets_or_directories: Vec<PathBuf>,
+        /// Perforce changelist to examine files from
+        #[structopt(long)]
+        perforce_changelist: Option<NonZeroU32>,
         /// Validation mode, [All|Mode1,Mode2,..],
         ///
         /// Valid modes are:
@@ -112,10 +123,10 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
                     .into_iter()
                     .filter_map(|entry| entry.ok())
                     .filter(|entry| {
-                        entry.file_name().to_str().map_or(false, |name| {
-                            !name.starts_with('.')
-                                && UASSET_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
-                        })
+                        entry
+                            .file_name()
+                            .to_str()
+                            .map_or(false, |name| !name.starts_with('.') && is_uasset(name))
                     })
                     .filter(|entry| entry.file_type().is_file())
                     .map(|entry| entry.path().to_path_buf())
@@ -125,6 +136,135 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
             }
         })
         .collect()
+}
+
+#[derive(Debug)]
+enum PerforceAction {
+    Add,
+    Edit,
+    Delete,
+    Branch,
+    MoveAdd,
+    MoveDelete,
+    Integrate,
+    Import,
+    Purge,
+    Archive,
+}
+
+impl<'de> Deserialize<'de> for PerforceAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_ref() {
+            "add" => Self::Add,
+            "edit" => Self::Edit,
+            "delete" => Self::Delete,
+            "branch" => Self::Branch,
+            "move/add" => Self::MoveAdd,
+            "move/delete" => Self::MoveDelete,
+            "integrate" => Self::Integrate,
+            "import" => Self::Import,
+            "purge" => Self::Purge,
+            "archive" => Self::Archive,
+            _ => {
+                return Err(serde::de::Error::custom(format!(
+                    "Invalid PerforceAction '{}'",
+                    s
+                )))
+            }
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+#[serde(rename_all = "camelCase")]
+struct PerforceOpenedRecord {
+    pub action: PerforceAction,
+    pub change: String,
+    pub client: String,
+    pub client_file: String,
+    pub depot_file: String,
+    pub moved_file: Option<String>,
+    pub have_rev: String,
+    pub rev: String,
+    #[serde(rename = "type")]
+    pub file_type: String,
+    pub user: String,
+}
+
+fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Vec<PathBuf>)> {
+    let asset_dir = TempDir::new()?;
+    let mut asset_paths = Vec::new();
+
+    let command = std::process::Command::new("p4")
+        .args(["-z", "tag", "-Mj"])
+        .arg("opened")
+        .arg("-a")
+        .args(["-c", &format!("{}", changelist)])
+        .output()?;
+
+    let stdout = std::str::from_utf8(&command.stdout)?;
+    if !command.status.success() {
+        let stderr = std::str::from_utf8(&command.stderr)?;
+        bail!(
+            "Failed to run `p4 opened`:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        );
+    }
+
+    for line in stdout.lines() {
+        let record: PerforceOpenedRecord = serde_json::from_str(line)?;
+        let modified_file = match record.action {
+            PerforceAction::Add => Some(record.client_file),
+            PerforceAction::Edit => Some(record.client_file),
+            PerforceAction::Branch => Some(record.client_file),
+            PerforceAction::MoveAdd => Some(record.client_file),
+            PerforceAction::Integrate => Some(record.client_file),
+            PerforceAction::Import => Some(record.client_file),
+            _ => None,
+        };
+        if let Some(path) = modified_file {
+            if !is_uasset(&path) {
+                continue;
+            }
+
+            let client_prefix = format!("//{}/", record.client);
+            let path = PathBuf::from(path);
+            let stripped_file = path.strip_prefix(client_prefix)?;
+            let local_path = asset_dir.path().join(stripped_file);
+            if let Some(parent_path) = local_path.parent() {
+                std::fs::create_dir_all(parent_path)?;
+            }
+
+            let file = File::create(&local_path)?;
+            let filespec = format!("{}@={}", record.depot_file, changelist);
+            let print_command = std::process::Command::new("p4")
+                .arg("print")
+                .arg("-q")
+                .arg(&filespec)
+                .stdout(std::process::Stdio::from(file))
+                .output()?;
+
+            ensure!(
+                print_command.status.success(),
+                "Failed to run `p4 print {}`",
+                filespec
+            );
+
+            asset_paths.push(local_path);
+        }
+    }
+
+    if asset_paths.is_empty() {
+        Ok((None, asset_paths))
+    } else {
+        Ok((Some(asset_dir), asset_paths))
+    }
 }
 
 fn try_parse(asset_path: &Path) -> Result<AssetHeader<BufReader<File>>> {
@@ -228,10 +368,21 @@ fn main() -> Result<()> {
         Command::Validate {
             assets_or_directories,
             mode,
+            perforce_changelist,
         } => {
             let mode = mode.unwrap_or(ValidationMode::All);
             let mut errors = Vec::new();
-            let asset_paths = recursively_walk_uassets(assets_or_directories);
+            let (temp_dir, asset_paths) = {
+                let mut asset_paths = recursively_walk_uassets(assets_or_directories);
+                if let Some(changelist) = perforce_changelist {
+                    let (asset_dir, mut assets) = fetch_perforce_uassets(changelist)?;
+                    asset_paths.append(&mut assets);
+                    (asset_dir, asset_paths)
+                } else {
+                    (None, asset_paths)
+                }
+            };
+
             let mut num_evaluated_assets = 0;
             for asset_path in asset_paths {
                 num_evaluated_assets += 1;
@@ -254,6 +405,10 @@ fn main() -> Result<()> {
                         ));
                     }
                 };
+            }
+
+            if let Some(temp_dir) = temp_dir {
+                temp_dir.close()?
             }
 
             if !errors.is_empty() {
