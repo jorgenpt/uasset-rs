@@ -316,6 +316,10 @@ impl UnrealEngineVersion {
             ..Self::empty()
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.changelist == 0
+    }
 }
 
 impl Deferrable for UnrealEngineVersion {

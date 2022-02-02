@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use log::{error, trace};
 use simplelog::{Config, TermLogger, TerminalMode};
 use std::{
@@ -13,6 +13,48 @@ use uasset::AssetHeader;
 use walkdir::WalkDir;
 
 const UASSET_EXTENSIONS: [&str; 2] = [".uasset", ".umap"];
+
+#[derive(Debug, PartialEq)]
+enum Validation {
+    #[allow(dead_code)]
+    AssetReferencesExist,
+    HasEngineVersion,
+}
+
+#[derive(Debug)]
+enum ValidationMode {
+    All,
+    Individual(Vec<Validation>),
+}
+
+impl ValidationMode {
+    pub fn includes(&self, validation: &Validation) -> bool {
+        if let Self::Individual(modes) = self {
+            modes.contains(validation)
+        } else {
+            true
+        }
+    }
+}
+
+fn parse_validation_mode(src: &str) -> Result<ValidationMode> {
+    if src == "All" {
+        Ok(ValidationMode::All)
+    } else {
+        let src = src.to_string();
+        let modes = src.split(',');
+        let mut parsed_modes = Vec::new();
+        for mode in modes {
+            let parsed_mode = match mode {
+                "AssetReferencesExist" => unimplemented!("Validation::AssetReferencesExist"),
+                "HasEngineVersion" => Validation::HasEngineVersion,
+                _ => bail!("Unrecognized validation mode {}", mode),
+            };
+            parsed_modes.push(parsed_mode);
+        }
+        Ok(ValidationMode::Individual(parsed_modes))
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -37,6 +79,18 @@ enum Command {
     Dump {
         /// Assets to dump, directories will be recursively searched for assets
         assets_or_directories: Vec<PathBuf>,
+    },
+    /// Run asset validations on the listed assets
+    Validate {
+        /// Assets to validate, directories will be recursively searched for assets
+        assets_or_directories: Vec<PathBuf>,
+        /// Validation mode, [All|Mode1,Mode2,..],
+        ///
+        /// Valid modes are:
+        ///  - AssetReferencesExist: Verify that all asset references to or from the listed assets are valid
+        ///  - HasEngineVersion: Verify that every asset has a valid engine version
+        #[structopt(long, parse(try_from_str = parse_validation_mode), verbatim_doc_comment)]
+        mode: Option<ValidationMode>,
     },
     /// Show the imports for the listed assets
     ListImports {
@@ -73,7 +127,29 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
         .collect()
 }
 
-fn try_parse<T: FnOnce(AssetHeader<BufReader<File>>)>(asset_path: &Path, callback: T) -> bool {
+fn try_parse(asset_path: &Path) -> Result<AssetHeader<BufReader<File>>> {
+    trace!("reading {}", asset_path.display());
+    match File::open(asset_path) {
+        Ok(file) => match AssetHeader::new(BufReader::new(file)) {
+            Ok(header) => Ok(header),
+            Err(error) => Err(anyhow!(
+                "failed to parse {}: {:?}",
+                asset_path.display(),
+                error
+            )),
+        },
+        Err(error) => Err(anyhow!(
+            "failed to load {}: {:?}",
+            asset_path.display(),
+            error
+        )),
+    }
+}
+
+fn try_parse_or_log<T: FnOnce(AssetHeader<BufReader<File>>)>(
+    asset_path: &Path,
+    callback: T,
+) -> bool {
     trace!("reading {}", asset_path.display());
     match File::open(asset_path) {
         Ok(file) => match AssetHeader::new(BufReader::new(file)) {
@@ -120,7 +196,7 @@ fn main() -> Result<()> {
                         num_imports = header.imports.len();
                     };
 
-                    if try_parse(&asset_path, reader) {
+                    if try_parse_or_log(&asset_path, reader) {
                         (0, num_imports)
                     } else {
                         (1, 0)
@@ -142,11 +218,56 @@ fn main() -> Result<()> {
         } => {
             let asset_paths = recursively_walk_uassets(assets_or_directories);
             for asset_path in asset_paths {
-                try_parse(&asset_path, |header| {
+                try_parse_or_log(&asset_path, |header| {
                     println!("{}:", asset_path.display());
                     println!("{:#?}", header);
                     println!();
                 });
+            }
+        }
+        Command::Validate {
+            assets_or_directories,
+            mode,
+        } => {
+            let mode = mode.unwrap_or(ValidationMode::All);
+            let mut errors = Vec::new();
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
+            let mut num_evaluated_assets = 0;
+            for asset_path in asset_paths {
+                num_evaluated_assets += 1;
+                match try_parse(&asset_path) {
+                    Ok(header) => {
+                        if header.engine_version.is_empty()
+                            && mode.includes(&Validation::HasEngineVersion)
+                        {
+                            errors.push(format!(
+                                "{}: Missing engine version, resave with a versioned editor",
+                                asset_path.display()
+                            ));
+                        }
+                    }
+                    Err(error) => {
+                        errors.push(format!(
+                            "{}: Could not parse asset: {}",
+                            asset_path.display(),
+                            error
+                        ));
+                    }
+                };
+            }
+
+            if !errors.is_empty() {
+                eprintln!(
+                    "Encountered {} errors in {} assets:",
+                    errors.len(),
+                    num_evaluated_assets
+                );
+                for error in errors {
+                    eprintln!("{}", error)
+                }
+                bail!("Validation failed");
+            } else {
+                println!("Checked {} assets, no errors", num_evaluated_assets);
             }
         }
         Command::ListImports {
@@ -155,7 +276,7 @@ fn main() -> Result<()> {
         } => {
             let asset_paths = recursively_walk_uassets(assets_or_directories);
             for asset_path in asset_paths {
-                try_parse(&asset_path, |header| {
+                try_parse_or_log(&asset_path, |header| {
                     println!("{}:", asset_path.display());
                     for import in header.package_import_iter() {
                         if !skip_code_imports || !import.starts_with("/Script/") {
