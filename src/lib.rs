@@ -123,7 +123,7 @@ use std::{
 };
 
 pub use archive::Archive;
-pub use enums::{ObjectVersion, PackageFlags};
+pub use enums::{ObjectVersion, ObjectVersionUE5, PackageFlags};
 pub use error::{Error, InvalidNameIndexError, Result};
 
 /// A reference to a name in the [`AssetHeader::names`] name table. You can use [`AssetHeader::resolve_name`] to get a human-readable

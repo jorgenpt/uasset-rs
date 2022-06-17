@@ -10,6 +10,10 @@ pub enum Error {
     InvalidFile,
     #[error("asset has unsupported legacy version value {0:?}")]
     UnsupportedVersion(i32),
+    #[error("asset has unsupported UE4 version value {0:?}")]
+    UnsupportedUE4Version(i32),
+    #[error("asset has unsupported UE5 version value {0:?}")]
+    UnsupportedUE5Version(i32),
     #[error("asset saved without asset version information")]
     UnversionedAsset,
     #[error("failed to parse data: {0:?}")]

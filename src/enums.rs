@@ -1,7 +1,9 @@
+use num_derive::FromPrimitive;
+
 /// Maps to `EUnrealEngineObjectUE4Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
 /// the various versions to the core serialized object format.
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Debug)]
+#[derive(Debug, FromPrimitive, PartialEq, PartialOrd)]
 pub enum ObjectVersion {
     VER_UE4_OLDEST_LOADABLE_PACKAGE = 214,
     VER_UE4_BLUEPRINT_VARS_NOT_READ_ONLY = 215,
@@ -312,6 +314,18 @@ pub enum ObjectVersion {
     VER_UE4_NON_OUTER_PACKAGE_IMPORT = 520,
     VER_UE4_ASSETREGISTRY_DEPENDENCYFLAGS = 521,
     VER_UE4_CORRECT_LICENSEE_FLAG = 522,
+}
+
+/// Maps to `EUnrealEngineObjectUE5Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
+/// the various versions to the core serialized object format.
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+#[derive(Debug, FromPrimitive)]
+pub enum ObjectVersionUE5 {
+    INITIAL_VERSION = 1000,
+    NAMES_REFERENCED_FROM_EXPORT_DATA = 1001,
+    PAYLOAD_TOC = 1002,
+    OPTIONAL_RESOURCES = 1003,
+    LARGE_WORLD_COORDINATES = 1004,
 }
 
 /// Maps to `EPackageFlags` in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h. The `UnusedN` entries
