@@ -1,7 +1,4 @@
 {
-    "rust-analyzer.cargo.features": [
-        "commandline-tool"
-    ],
     "rust-analyzer.checkOnSave.command": "clippy",
     "editor.formatOnSave": true
 }
