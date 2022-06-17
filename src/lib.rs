@@ -299,11 +299,7 @@ where
         let mut archive = Archive::new(reader)?;
 
         // Parse and seek past `CustomVersionContainer`
-        let num_custom_versions: i32 = archive.read_le()?;
-        let custom_versions_stream_info = ArrayStreamInfo {
-            offset: archive.stream_position()?,
-            count: num_custom_versions as u64,
-        };
+        let custom_versions_stream_info = ArrayStreamInfo::from_current_position(&mut archive)?;
         match archive.custom_version_serialization_format() {
             CustomVersionSerializationFormat::Guids => {
                 let _custom_versions = UnrealArray::<UnrealGuidCustomVersion>::seek_past_with_info(

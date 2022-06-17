@@ -7,7 +7,10 @@ use std::{
 };
 
 use crate::{
-    serialization::{ArrayStreamInfo, Deferrable, Parseable, SingleItemStreamInfo, Skippable},
+    serialization::{
+        ArrayStreamInfo, Deferrable, Parseable, ReadInfo, SingleItemStreamInfo, Skippable,
+        StreamInfo,
+    },
     Error, NameReference, ObjectImport, Result,
 };
 
@@ -109,7 +112,7 @@ impl Parseable for UnrealString {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
@@ -143,7 +146,7 @@ impl Parseable for UnrealNameEntryWithHash {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
@@ -166,9 +169,10 @@ impl<ElementType> Deferrable for UnrealArray<ElementType> {
     type StreamInfoType = ArrayStreamInfo;
 }
 
-impl<ElementType> Skippable for UnrealArray<ElementType>
+impl<ElementType, ElementTypeStreamInfo> Skippable for UnrealArray<ElementType>
 where
-    ElementType: Skippable<StreamInfoType = SingleItemStreamInfo>,
+    ElementType: Skippable<StreamInfoType = ElementTypeStreamInfo>,
+    ElementTypeStreamInfo: StreamInfo,
 {
     fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
     where
@@ -177,9 +181,7 @@ where
         reader.seek(SeekFrom::Start(stream_info.offset))?;
 
         for _ in 0..stream_info.count {
-            let element_stream_info = SingleItemStreamInfo {
-                offset: reader.stream_position()?,
-            };
+            let element_stream_info = ElementTypeStreamInfo::from_current_position(reader)?;
             ElementType::seek_past_with_info(reader, &element_stream_info)?;
         }
 
@@ -187,29 +189,24 @@ where
     }
 }
 
-impl<ElementType> Parseable for UnrealArray<ElementType>
+impl<ElementType, ElementStreamInfoType> Parseable for UnrealArray<ElementType>
 where
-    ElementType: Parseable<StreamInfoType = SingleItemStreamInfo>,
+    ElementType: Parseable<StreamInfoType = ElementStreamInfoType>,
+    ElementStreamInfoType: StreamInfo,
 {
     type ParsedType = Vec<ElementType::ParsedType>;
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        stream_info: &Self::StreamInfoType,
+        read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
     {
-        // The elements will be sequential, so we use the `seekless` trait method and just pass a bogus
-        // offset.
-        let invalid_stream_info = SingleItemStreamInfo { offset: u64::MAX };
-
-        let mut elements = Vec::with_capacity(stream_info.count as usize);
-        for _ in 0..stream_info.count {
-            elements.push(ElementType::parse_with_info_seekless(
-                reader,
-                &invalid_stream_info,
-            )?);
+        let mut elements = Vec::with_capacity(read_info.count as usize);
+        for _ in 0..read_info.count {
+            let read_info = ElementStreamInfoType::ReadInfoType::from_current_position(reader)?;
+            elements.push(ElementType::parse_with_info_seekless(reader, &read_info)?);
         }
 
         Ok(elements)
@@ -357,7 +354,7 @@ impl Parseable for UnrealEngineVersion {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
@@ -390,7 +387,7 @@ impl Parseable for UnrealNameReference {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
@@ -413,7 +410,7 @@ impl Parseable for UnrealClassImport {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
@@ -444,7 +441,7 @@ impl Parseable for UnrealClassImportWithPackageName {
 
     fn parse_with_info_seekless<R>(
         reader: &mut R,
-        _stream_info: &Self::StreamInfoType,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
         R: Seek + Read,
