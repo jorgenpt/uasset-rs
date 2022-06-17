@@ -15,10 +15,7 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
     assert!(header.is_ok());
     let header = header.unwrap();
 
-    assert_eq!(
-        header.archive.file_version,
-        version_info.object_version as i32
-    );
+    assert_eq!(header.archive.file_version, version_info.object_version);
 
     assert!(
         header

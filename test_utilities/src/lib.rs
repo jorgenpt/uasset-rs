@@ -51,37 +51,74 @@ impl UnrealVersion {
 }
 
 #[template]
+#[export]
 #[rstest]
-#[case::ue_4_10(UnrealVersionInfo::ue4(10, ObjectVersion::VER_UE4_APEX_CLOTH_TESSELLATION))]
-#[case::ue_4_11(UnrealVersionInfo::ue4(
+#[case::ue_4_10(test_utilities::UnrealVersionInfo::ue4(
+    10,
+    test_utilities::ObjectVersion::VER_UE4_APEX_CLOTH_TESSELLATION
+))]
+#[case::ue_4_11(test_utilities::UnrealVersionInfo::ue4(
     11,
-    ObjectVersion::VER_UE4_STREAMABLE_TEXTURE_MIN_MAX_DISTANCE
+    test_utilities::ObjectVersion::VER_UE4_STREAMABLE_TEXTURE_MIN_MAX_DISTANCE
 ))]
-#[case::ue_4_12(UnrealVersionInfo::ue4(12, ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED))]
-#[case::ue_4_13(UnrealVersionInfo::ue4(
+#[case::ue_4_12(test_utilities::UnrealVersionInfo::ue4(
+    12,
+    test_utilities::ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED
+))]
+#[case::ue_4_13(test_utilities::UnrealVersionInfo::ue4(
     13,
-    ObjectVersion::VER_UE4_INSTANCED_STEREO_UNIFORM_REFACTOR
+    test_utilities::ObjectVersion::VER_UE4_INSTANCED_STEREO_UNIFORM_REFACTOR
 ))]
-#[case::ue_4_14(UnrealVersionInfo::ue4(
+#[case::ue_4_14(test_utilities::UnrealVersionInfo::ue4(
     14,
-    ObjectVersion::VER_UE4_TemplateIndex_IN_COOKED_EXPORTS
+    test_utilities::ObjectVersion::VER_UE4_TemplateIndex_IN_COOKED_EXPORTS
 ))]
-#[case::ue_4_15(UnrealVersionInfo::ue4(15, ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES))]
-#[case::ue_4_16(UnrealVersionInfo::ue4(16, ObjectVersion::VER_UE4_ADDED_SWEEP_WHILE_WALKING_FLAG))]
-#[case::ue_4_17(UnrealVersionInfo::ue4(17, ObjectVersion::VER_UE4_ADDED_SWEEP_WHILE_WALKING_FLAG))]
-#[case::ue_4_18(UnrealVersionInfo::ue4(18, ObjectVersion::VER_UE4_ADDED_SOFT_OBJECT_PATH))]
-#[case::ue_4_19(UnrealVersionInfo::ue4(
+#[case::ue_4_15(test_utilities::UnrealVersionInfo::ue4(
+    15,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_SEARCHABLE_NAMES
+))]
+#[case::ue_4_16(test_utilities::UnrealVersionInfo::ue4(
+    16,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_SWEEP_WHILE_WALKING_FLAG
+))]
+#[case::ue_4_17(test_utilities::UnrealVersionInfo::ue4(
+    17,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_SWEEP_WHILE_WALKING_FLAG
+))]
+#[case::ue_4_18(test_utilities::UnrealVersionInfo::ue4(
+    18,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_SOFT_OBJECT_PATH
+))]
+#[case::ue_4_19(test_utilities::UnrealVersionInfo::ue4(
     19,
-    ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID
+    test_utilities::ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID
 ))]
-#[case::ue_4_20(UnrealVersionInfo::ue4(
+#[case::ue_4_20(test_utilities::UnrealVersionInfo::ue4(
     20,
-    ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID
+    test_utilities::ObjectVersion::VER_UE4_ADDED_PACKAGE_SUMMARY_LOCALIZATION_ID
 ))]
-#[case::ue_4_21(UnrealVersionInfo::ue4(21, ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC))]
-#[case::ue_4_22(UnrealVersionInfo::ue4(22, ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC))]
-#[case::ue_4_23(UnrealVersionInfo::ue4(23, ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC))]
-#[case::ue_4_24(UnrealVersionInfo::ue4(24, ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER))]
-#[case::ue_4_25(UnrealVersionInfo::ue4(25, ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER))]
-#[case::ue_4_26(UnrealVersionInfo::ue4(26, ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG))]
-pub fn all_versions(#[case] version_info: UnrealVersionInfo) {}
+#[case::ue_4_21(test_utilities::UnrealVersionInfo::ue4(
+    21,
+    test_utilities::ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC
+))]
+#[case::ue_4_22(test_utilities::UnrealVersionInfo::ue4(
+    22,
+    test_utilities::ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC
+))]
+#[case::ue_4_23(test_utilities::UnrealVersionInfo::ue4(
+    23,
+    test_utilities::ObjectVersion::VER_UE4_FIX_WIDE_STRING_CRC
+))]
+#[case::ue_4_24(test_utilities::UnrealVersionInfo::ue4(
+    24,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER
+))]
+#[case::ue_4_25(test_utilities::UnrealVersionInfo::ue4(
+    25,
+    test_utilities::ObjectVersion::VER_UE4_ADDED_PACKAGE_OWNER
+))]
+#[case::ue_4_26(test_utilities::UnrealVersionInfo::ue4(
+    26,
+    test_utilities::ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG
+))]
+fn all_versions(#[case] version_info: UnrealVersionInfo) {}
