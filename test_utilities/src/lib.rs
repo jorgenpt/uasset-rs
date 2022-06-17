@@ -1,15 +1,17 @@
 pub use rstest_reuse::{self, template};
 use std::path::PathBuf;
 
-pub use uasset::ObjectVersion;
+pub use uasset::{ObjectVersion, ObjectVersionUE5};
 
 const LATEST_UE4_MINOR_VERSION: u32 = 27;
+const LATEST_UE5_MINOR_VERSION: u32 = 0;
 
 pub struct UnrealVersion(pub u32, pub u32);
 pub struct UnrealVersionInfo {
     pub version: UnrealVersion,
     pub next_version: Option<UnrealVersion>,
     pub object_version: ObjectVersion,
+    pub object_version_ue5: Option<ObjectVersionUE5>,
 }
 
 impl UnrealVersionInfo {
@@ -22,6 +24,20 @@ impl UnrealVersionInfo {
                 None
             },
             object_version,
+            object_version_ue5: None,
+        }
+    }
+
+    pub fn ue5(minor_version: u32, object_version_ue5: ObjectVersionUE5) -> Self {
+        Self {
+            version: UnrealVersion(5, minor_version),
+            next_version: if minor_version < LATEST_UE5_MINOR_VERSION {
+                Some(UnrealVersion(5, minor_version + 1))
+            } else {
+                None
+            },
+            object_version: ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG,
+            object_version_ue5: Some(object_version_ue5),
         }
     }
 }
@@ -124,5 +140,9 @@ impl UnrealVersion {
 #[case::ue_4_27(test_utilities::UnrealVersionInfo::ue4(
     27,
     test_utilities::ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG
+))]
+#[case::ue_5_0(test_utilities::UnrealVersionInfo::ue5(
+    0,
+    test_utilities::ObjectVersionUE5::LARGE_WORLD_COORDINATES
 ))]
 fn all_versions(#[case] version_info: UnrealVersionInfo) {}

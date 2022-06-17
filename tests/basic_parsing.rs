@@ -16,6 +16,10 @@ fn loading_asset(#[case] version_info: UnrealVersionInfo) {
     let header = header.unwrap();
 
     assert_eq!(header.archive.file_version, version_info.object_version);
+    assert_eq!(
+        header.archive.file_version_ue5,
+        version_info.object_version_ue5
+    );
 
     assert!(
         header
@@ -44,6 +48,12 @@ fn upgrading_asset(#[case] version_info: UnrealVersionInfo) {
     assert!(
         new_header.archive.file_version >= old_header.archive.file_version,
         "new_header.file_version_ue4 = {}, old_header.file_version_ue4 = {}",
+        new_header.archive.file_version,
+        old_header.archive.file_version
+    );
+    assert!(
+        new_header.archive.file_version_ue5 >= old_header.archive.file_version_ue5,
+        "new_header.file_version_ue5 = {}, old_header.file_version_ue5 = {}",
         new_header.archive.file_version,
         old_header.archive.file_version
     );
