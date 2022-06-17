@@ -20,19 +20,11 @@ fn simple_refs(#[case] version_info: UnrealVersionInfo) {
         let asset_path = version_info.version.resolve_ue_path(asset);
         let package = AssetHeader::new(File::open(asset_path).unwrap()).unwrap();
 
-        let asset_imports: Vec<_> = package
+        let asset_imports: Vec<String> = package
             .package_import_iter()
             .filter(|import| !import.starts_with("/Script/"))
             .collect();
 
-        assert_eq!(asset_imports.len(), expected_imports.len());
-        for expected_import in expected_imports {
-            assert!(
-                asset_imports.iter().any(|import| import == expected_import),
-                "missing import for {} in {}",
-                expected_import,
-                asset
-            );
-        }
+        assert_eq!(&asset_imports, expected_imports);
     }
 }
