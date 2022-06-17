@@ -113,7 +113,8 @@ use binread::BinReaderExt;
 use serialization::{
     ArrayStreamInfo, Parseable, Skippable, UnrealArray, UnrealClassImport,
     UnrealClassImportWithPackageName, UnrealCompressedChunk, UnrealCustomVersion,
-    UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid, UnrealNameEntryWithHash, UnrealString,
+    UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid, UnrealGuidCustomVersion,
+    UnrealNameEntryWithHash, UnrealString,
 };
 use std::{
     borrow::Cow,
@@ -122,7 +123,7 @@ use std::{
     num::NonZeroU32,
 };
 
-pub use archive::Archive;
+pub use archive::{Archive, CustomVersionSerializationFormat};
 pub use enums::{ObjectVersion, ObjectVersionUE5, PackageFlags};
 pub use error::{Error, InvalidNameIndexError, Result};
 
@@ -303,10 +304,20 @@ where
             offset: archive.stream_position()?,
             count: num_custom_versions as u64,
         };
-        let _custom_versions = UnrealArray::<UnrealCustomVersion>::seek_past_with_info(
-            &mut archive,
-            &custom_versions_stream_info,
-        )?;
+        match archive.custom_version_serialization_format() {
+            CustomVersionSerializationFormat::Guids => {
+                let _custom_versions = UnrealArray::<UnrealGuidCustomVersion>::seek_past_with_info(
+                    &mut archive,
+                    &custom_versions_stream_info,
+                )?;
+            }
+            CustomVersionSerializationFormat::Optimized => {
+                let _custom_versions = UnrealArray::<UnrealCustomVersion>::seek_past_with_info(
+                    &mut archive,
+                    &custom_versions_stream_info,
+                )?;
+            }
+        }
 
         let total_header_size = archive.read_le()?;
 

@@ -6,6 +6,12 @@ use std::io::{Read, Seek};
 /// Magic sequence identifying an unreal asset (can also be used to determine endianness)
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
+/// The format of an asset's custom versions, derived from `legacy_version` (see `FCustomVersionContainer::Serialize`)
+pub enum CustomVersionSerializationFormat {
+    Guids,
+    Optimized,
+}
+
 #[derive(Debug)]
 pub struct Archive<R> {
     pub reader: R,
@@ -30,7 +36,7 @@ where
 
         // See `void operator<<(FStructuredArchive::FSlot Slot, FPackageFileSummary& Sum)` in Engine/Source/Runtime/CoreUObject/Private/UObject/PackageFileSummary.cpp
         let legacy_version: i32 = reader.read_le()?;
-        if !(-8..=-6).contains(&legacy_version) {
+        if !(-8..=-5).contains(&legacy_version) {
             return Err(Error::UnsupportedVersion(legacy_version));
         }
 
@@ -83,6 +89,14 @@ where
 
     pub fn serialized_without(&self, version: ObjectVersion) -> bool {
         !self.serialized_with(version)
+    }
+
+    pub fn custom_version_serialization_format(&self) -> CustomVersionSerializationFormat {
+        if self.legacy_version < -5 {
+            CustomVersionSerializationFormat::Optimized
+        } else {
+            CustomVersionSerializationFormat::Guids
+        }
     }
 }
 

@@ -234,8 +234,7 @@ impl Skippable for UnrealGuid {
     }
 }
 
-/// Size of `FCustomVersion`, when serializing with `ECustomVersionSerializationFormat::Optimized` which is the case in
-/// all the file versions we support.
+/// Size of `FCustomVersion`, when serializing with `ECustomVersionSerializationFormat::Optimized`
 const CUSTOM_VERSION_SIZE: u64 = 20;
 pub struct UnrealCustomVersion {}
 
@@ -249,6 +248,27 @@ impl Skippable for UnrealCustomVersion {
         R: Seek + Read,
     {
         reader.seek(SeekFrom::Start(stream_info.offset + CUSTOM_VERSION_SIZE))?;
+        Ok(())
+    }
+}
+
+/// Size of `FGuidCustomVersion_DEPRECATED` excluding the `FString`, when serializing with `ECustomVersionSerializationFormat::Guid`
+const GUID_CUSTOM_VERSION_PREFIX_SIZE: u64 = 20;
+pub struct UnrealGuidCustomVersion {}
+
+impl Deferrable for UnrealGuidCustomVersion {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Skippable for UnrealGuidCustomVersion {
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(
+            stream_info.offset + GUID_CUSTOM_VERSION_PREFIX_SIZE,
+        ))?;
+        UnrealString::seek_past(reader)?;
         Ok(())
     }
 }
