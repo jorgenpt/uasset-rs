@@ -182,7 +182,7 @@ impl ReadInfo for ArrayReadInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayStreamInfo {
     pub offset: u64,
     pub count: u64,

@@ -111,15 +111,15 @@ mod serialization;
 
 use binread::BinReaderExt;
 use serialization::{
-    ArrayStreamInfo, Parseable, Skippable, UnrealArray, UnrealClassImport,
-    UnrealClassImportWithPackageName, UnrealCompressedChunk, UnrealCustomVersion,
-    UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid, UnrealGuidCustomVersion,
-    UnrealNameEntryWithHash, UnrealString,
+    ArrayStreamInfo, Parseable, Skippable, StreamInfo, UnrealArray, UnrealArrayIterator,
+    UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
+    UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid,
+    UnrealGuidCustomVersion, UnrealNameEntryWithHash, UnrealString, UnrealThumbnailInfo,
 };
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    io::{Read, Seek},
+    io::{Read, Seek, SeekFrom},
     num::NonZeroU32,
 };
 
@@ -235,6 +235,14 @@ impl<'a, R> Iterator for ImportIterator<'a, R> {
 
         None
     }
+}
+
+/// Represents the metadata about a thumbnail for an asset, stored behind [`AssetHeader::thumbnail_table_offsets`] (see `ThumbnailTools::LoadThumbnailsFromPackageInternal`)
+#[derive(Debug)]
+pub struct ThumbnailInfo {
+    pub object_class_name: String,
+    pub object_path_without_package_name: String,
+    pub file_offset: i32,
 }
 
 /// A table of contents for a uasset loaded from disk, containing all the shared package summary information.
@@ -510,5 +518,19 @@ impl<R> AssetHeader<R> {
     /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
     pub fn package_import_iter(&self) -> ImportIterator<'_, R> {
         ImportIterator::new(self)
+    }
+}
+
+impl<R> AssetHeader<R>
+where
+    R: Seek + Read,
+{
+    /// Create an iterator over the names of just the packages imported by this asset (i.e. its dependencies).
+    pub fn thumbnail_iter(&mut self) -> Result<UnrealArrayIterator<'_, UnrealThumbnailInfo, R>> {
+        self.archive
+            .seek(SeekFrom::Start(self.thumbnail_table_offset as u64))?;
+
+        let stream_info = ArrayStreamInfo::from_current_position(&mut self.archive)?;
+        UnrealArrayIterator::new(self, stream_info)
     }
 }

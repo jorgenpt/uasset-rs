@@ -116,6 +116,11 @@ enum Command {
         #[structopt(long)]
         skip_code_imports: bool,
     },
+    /// Dump some information about the thumbnails for the listed assets
+    DumpThumbnailInfo {
+        /// Assets to dump thumbnail info for, directories will be recursively searched for assets
+        assets_or_directories: Vec<PathBuf>,
+    },
 }
 
 fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -447,6 +452,38 @@ fn main() -> Result<()> {
                             println!("  {}", import);
                         }
                     }
+                });
+            }
+        }
+        Command::DumpThumbnailInfo {
+            assets_or_directories,
+        } => {
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
+            for asset_path in asset_paths {
+                try_parse_or_log(&asset_path, |mut header| {
+                    println!("{}:", asset_path.display());
+                    match header.thumbnail_iter() {
+                        Ok(thumbnail_iter) => {
+                            for thumbnail_info in thumbnail_iter {
+                                match thumbnail_info {
+                                    Ok(thumbnail_info) => println!("{:#?}", thumbnail_info),
+                                    Err(error) => error!(
+                                        "failed to read a specific thumbnail for {}: {:?}",
+                                        asset_path.display(),
+                                        error
+                                    ),
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            error!(
+                                "failed to read thumbnails for {}: {:?}",
+                                asset_path.display(),
+                                error
+                            );
+                        }
+                    }
+                    println!();
                 });
             }
         }

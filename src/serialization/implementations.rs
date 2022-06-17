@@ -2,6 +2,7 @@ use binread::BinReaderExt;
 use bit_field::BitField;
 use std::{
     io::{Read, Seek, SeekFrom},
+    marker::PhantomData,
     mem::size_of,
     num::NonZeroU32,
 };
@@ -11,7 +12,7 @@ use crate::{
         ArrayStreamInfo, Deferrable, Parseable, ReadInfo, SingleItemStreamInfo, Skippable,
         StreamInfo,
     },
-    Error, NameReference, ObjectImport, Result,
+    AssetHeader, Error, NameReference, ObjectImport, Result, ThumbnailInfo,
 };
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
@@ -210,6 +211,59 @@ where
         }
 
         Ok(elements)
+    }
+}
+
+#[derive(Debug)]
+pub struct UnrealArrayIterator<'a, ElementType, R>
+where
+    ElementType: Parseable,
+{
+    package: &'a mut AssetHeader<R>,
+    stream_info: ArrayStreamInfo,
+    next_index: u64,
+    phantom: PhantomData<ElementType>,
+}
+
+impl<'a, ElementType, ElementStreamInfoType, R> UnrealArrayIterator<'a, ElementType, R>
+where
+    ElementType: Parseable<StreamInfoType = ElementStreamInfoType>,
+    ElementStreamInfoType: StreamInfo,
+    R: Seek + Read,
+{
+    pub fn new(package: &'a mut AssetHeader<R>, stream_info: ArrayStreamInfo) -> Result<Self> {
+        package.archive.seek(SeekFrom::Start(stream_info.offset))?;
+        Ok(Self {
+            package,
+            stream_info,
+            next_index: 0,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<'a, ElementType, ElementStreamInfoType, R> Iterator for UnrealArrayIterator<'a, ElementType, R>
+where
+    ElementType: Parseable<StreamInfoType = ElementStreamInfoType>,
+    ElementStreamInfoType: StreamInfo,
+    R: Seek + Read,
+{
+    type Item = Result<ElementType::ParsedType>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next_index < self.stream_info.count {
+            self.next_index += 1;
+            Some(
+                ElementStreamInfoType::ReadInfoType::from_current_position(
+                    &mut self.package.archive,
+                )
+                .and_then(|read_info| {
+                    ElementType::parse_with_info_seekless(&mut self.package.archive, &read_info)
+                }),
+            )
+        } else {
+            None
+        }
     }
 }
 
@@ -457,6 +511,34 @@ impl Parseable for UnrealClassImportWithPackageName {
             outer_index,
             object_name,
             package_name: Some(package_name),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct UnrealThumbnailInfo {}
+
+impl Deferrable for UnrealThumbnailInfo {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Parseable for UnrealThumbnailInfo {
+    type ParsedType = ThumbnailInfo;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        let object_class_name = UnrealString::parse_inline(reader)?;
+        let object_path_without_package_name = UnrealString::parse_inline(reader)?;
+        let file_offset = reader.read_le()?;
+        Ok(Self::ParsedType {
+            object_class_name,
+            object_path_without_package_name,
+            file_offset,
         })
     }
 }
