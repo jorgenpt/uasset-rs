@@ -260,7 +260,11 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
 
             asset_paths.push(local_path);
         } else {
-            trace!("ignoring file {} with non-modification action {:?}", record.depot_file, record.action);
+            trace!(
+                "ignoring file {} with non-modification action {:?}",
+                record.depot_file,
+                record.action
+            );
         }
     }
 
@@ -319,6 +323,7 @@ fn main() -> Result<()> {
         options.verbose.get_level_filter(),
         Config::default(),
         TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
     )?;
 
     match options.cmd {
