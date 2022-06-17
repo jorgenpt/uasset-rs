@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 pub use uasset::ObjectVersion;
 
-const LATEST_UE4_MINOR_VERSION: u32 = 26;
+const LATEST_UE4_MINOR_VERSION: u32 = 27;
 
 pub struct UnrealVersion(pub u32, pub u32);
 pub struct UnrealVersionInfo {
@@ -119,6 +119,10 @@ impl UnrealVersion {
 ))]
 #[case::ue_4_26(test_utilities::UnrealVersionInfo::ue4(
     26,
+    test_utilities::ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG
+))]
+#[case::ue_4_27(test_utilities::UnrealVersionInfo::ue4(
+    27,
     test_utilities::ObjectVersion::VER_UE4_CORRECT_LICENSEE_FLAG
 ))]
 fn all_versions(#[case] version_info: UnrealVersionInfo) {}
