@@ -109,12 +109,13 @@ mod enums;
 mod error;
 mod serialization;
 
+use archive::SerializedObjectVersion;
 use binread::BinReaderExt;
 use serialization::{
     ArrayStreamInfo, Parseable, Skippable, StreamInfo, UnrealArray, UnrealArrayIterator,
-    UnrealClassImport, UnrealClassImportWithPackageName, UnrealCompressedChunk,
-    UnrealCustomVersion, UnrealEngineVersion, UnrealGenerationInfo, UnrealGuid,
-    UnrealGuidCustomVersion, UnrealNameEntryWithHash, UnrealString, UnrealThumbnailInfo,
+    UnrealClassImport, UnrealCompressedChunk, UnrealCustomVersion, UnrealEngineVersion,
+    UnrealGenerationInfo, UnrealGuid, UnrealGuidCustomVersion, UnrealNameEntryWithHash,
+    UnrealString, UnrealThumbnailInfo,
 };
 use std::{
     borrow::Cow,
@@ -160,6 +161,8 @@ pub struct ObjectImport {
     pub object_name: NameReference,
     /// Package name this import belongs to (C++ name: `PackageName`)
     pub package_name: Option<NameReference>,
+    /// Does this import come from an optional package (C++ name: `bImportOptional`)
+    pub import_optional: bool,
 }
 
 impl ObjectImport {
@@ -329,6 +332,7 @@ where
 
         let package_flags = archive.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
+        archive.with_editoronly_data = has_editor_only_data;
 
         let names = if archive.serialized_with(ObjectVersion::VER_UE4_NAME_HASHES_SERIALIZED) {
             UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut archive)?
@@ -356,13 +360,7 @@ where
         let export_count = archive.read_le()?;
         let export_offset = archive.read_le()?;
 
-        let imports = if archive.serialized_with(ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT)
-            && has_editor_only_data
-        {
-            UnrealArray::<UnrealClassImportWithPackageName>::parse_indirect(&mut archive)?
-        } else {
-            UnrealArray::<UnrealClassImport>::parse_indirect(&mut archive)?
-        };
+        let imports = UnrealArray::<UnrealClassImport>::parse_indirect(&mut archive)?;
 
         let depends_offset = archive.read_le()?;
 

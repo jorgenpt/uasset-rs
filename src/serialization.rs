@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use crate::Result;
+use crate::{
+    archive::{SerializedFlags, SerializedObjectVersion},
+    ObjectVersion, ObjectVersionUE5, Result,
+};
 use binread::BinReaderExt;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -52,14 +55,22 @@ where
         read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read;
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags;
 
     fn parse_with_info<R>(
         reader: &mut R,
         stream_info: &Self::StreamInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         reader.seek(SeekFrom::Start(stream_info.get_offset()))?;
         Self::parse_with_info_seekless(reader, &stream_info.to_read_info())
@@ -67,7 +78,11 @@ where
 
     fn parse_inline<R>(reader: &mut R) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let read_info =
             <Self::StreamInfoType as StreamInfo>::ReadInfoType::from_current_position(reader)?;
@@ -76,7 +91,11 @@ where
 
     fn parse_indirect<R>(reader: &mut R) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let stream_info = Self::StreamInfoType::from_indirect_reference(reader)?;
         let current_position = reader.stream_position()?;

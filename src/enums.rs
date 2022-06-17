@@ -4,7 +4,7 @@ use std::fmt;
 /// Maps to `EUnrealEngineObjectUE4Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
 /// the various versions to the core serialized object format.
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Debug, FromPrimitive, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, PartialOrd)]
 pub enum ObjectVersion {
     VER_UE4_OLDEST_LOADABLE_PACKAGE = 214,
     VER_UE4_BLUEPRINT_VARS_NOT_READ_ONLY = 215,
@@ -326,7 +326,7 @@ impl fmt::Display for ObjectVersion {
 /// Maps to `EUnrealEngineObjectUE5Version` in Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h -- this tracks
 /// the various versions to the core serialized object format.
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Debug, FromPrimitive, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, FromPrimitive, PartialEq, PartialOrd)]
 pub enum ObjectVersionUE5 {
     INITIAL_VERSION = 1000,
     NAMES_REFERENCED_FROM_EXPORT_DATA = 1001,

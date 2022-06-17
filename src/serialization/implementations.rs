@@ -8,11 +8,13 @@ use std::{
 };
 
 use crate::{
+    archive::{SerializedFlags, SerializedObjectVersion},
     serialization::{
         ArrayStreamInfo, Deferrable, Parseable, ReadInfo, SingleItemStreamInfo, Skippable,
         StreamInfo,
     },
-    AssetHeader, Error, NameReference, ObjectImport, Result, ThumbnailInfo,
+    AssetHeader, Error, NameReference, ObjectImport, ObjectVersion, ObjectVersionUE5, Result,
+    ThumbnailInfo,
 };
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
@@ -202,7 +204,11 @@ where
         read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let mut elements = Vec::with_capacity(read_info.count as usize);
         for _ in 0..read_info.count {
@@ -411,7 +417,11 @@ impl Parseable for UnrealEngineVersion {
         _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let major = reader.read_le()?;
         let minor = reader.read_le()?;
@@ -467,50 +477,38 @@ impl Parseable for UnrealClassImport {
         _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let class_package = UnrealNameReference::parse_inline(reader)?;
         let class_name = UnrealNameReference::parse_inline(reader)?;
         let outer_index = reader.read_le()?;
         let object_name = UnrealNameReference::parse_inline(reader)?;
+        let package_name = if reader
+            .serialized_with(ObjectVersion::VER_UE4_NON_OUTER_PACKAGE_IMPORT)
+            && reader.serialized_with_editoronly_data()
+        {
+            Some(UnrealNameReference::parse_inline(reader)?)
+        } else {
+            None
+        };
+
+        let import_optional = if reader.serialized_with(ObjectVersionUE5::OPTIONAL_RESOURCES) {
+            reader.read_le::<u32>()? != 0
+        } else {
+            false
+        };
+
         Ok(Self::ParsedType {
             class_package,
             class_name,
             outer_index,
             object_name,
-            package_name: None,
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct UnrealClassImportWithPackageName {}
-
-impl Deferrable for UnrealClassImportWithPackageName {
-    type StreamInfoType = SingleItemStreamInfo;
-}
-
-impl Parseable for UnrealClassImportWithPackageName {
-    type ParsedType = ObjectImport;
-
-    fn parse_with_info_seekless<R>(
-        reader: &mut R,
-        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
-    ) -> Result<Self::ParsedType>
-    where
-        R: Seek + Read,
-    {
-        let class_package = UnrealNameReference::parse_inline(reader)?;
-        let class_name = UnrealNameReference::parse_inline(reader)?;
-        let outer_index = reader.read_le()?;
-        let object_name = UnrealNameReference::parse_inline(reader)?;
-        let package_name = UnrealNameReference::parse_inline(reader)?;
-        Ok(Self::ParsedType {
-            class_package,
-            class_name,
-            outer_index,
-            object_name,
-            package_name: Some(package_name),
+            package_name,
+            import_optional,
         })
     }
 }
@@ -530,7 +528,11 @@ impl Parseable for UnrealThumbnailInfo {
         _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
     ) -> Result<Self::ParsedType>
     where
-        R: Seek + Read,
+        R: Seek
+            + Read
+            + SerializedObjectVersion<ObjectVersion>
+            + SerializedObjectVersion<ObjectVersionUE5>
+            + SerializedFlags,
     {
         let object_class_name = UnrealString::parse_inline(reader)?;
         let object_path_without_package_name = UnrealString::parse_inline(reader)?;

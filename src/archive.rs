@@ -22,6 +22,8 @@ pub struct Archive<R> {
     /// The licensee serialization version used when saving this asset (C++ name: `FileVersionLicenseeUE4`)
     pub file_licensee_version: i32,
     pub legacy_version: i32,
+    // Copied from the [`AssetHeader::package_flags`] to be accessible during serialization
+    pub with_editoronly_data: bool,
 }
 
 impl<R> Archive<R>
@@ -76,6 +78,7 @@ where
             file_version_ue5,
             file_licensee_version,
             legacy_version,
+            with_editoronly_data: false,
         })
     }
 
@@ -83,19 +86,45 @@ where
         &mut self.reader
     }
 
-    pub fn serialized_with(&self, version: ObjectVersion) -> bool {
-        self.file_version >= version
-    }
-
-    pub fn serialized_without(&self, version: ObjectVersion) -> bool {
-        !self.serialized_with(version)
-    }
-
     pub fn custom_version_serialization_format(&self) -> CustomVersionSerializationFormat {
         if self.legacy_version < -5 {
             CustomVersionSerializationFormat::Optimized
         } else {
             CustomVersionSerializationFormat::Guids
+        }
+    }
+}
+
+pub trait SerializedFlags {
+    fn serialized_with_editoronly_data(&self) -> bool;
+}
+
+impl<R> SerializedFlags for Archive<R> {
+    fn serialized_with_editoronly_data(&self) -> bool {
+        self.with_editoronly_data
+    }
+}
+
+pub trait SerializedObjectVersion<T> {
+    fn serialized_with(&self, version: T) -> bool;
+
+    fn serialized_without(&self, version: T) -> bool {
+        !self.serialized_with(version)
+    }
+}
+
+impl<R> SerializedObjectVersion<ObjectVersion> for Archive<R> {
+    fn serialized_with(&self, version: ObjectVersion) -> bool {
+        self.file_version >= version
+    }
+}
+
+impl<R> SerializedObjectVersion<ObjectVersionUE5> for Archive<R> {
+    fn serialized_with(&self, version: ObjectVersionUE5) -> bool {
+        if let Some(file_version) = self.file_version_ue5 {
+            file_version >= version
+        } else {
+            false
         }
     }
 }
