@@ -145,4 +145,8 @@ impl UnrealVersion {
     0,
     test_utilities::ObjectVersionUE5::LARGE_WORLD_COORDINATES
 ))]
+#[case::ue_5_1(test_utilities::UnrealVersionInfo::ue5(
+    1,
+    test_utilities::ObjectVersionUE5::ADD_SOFTOBJECTPATH_LIST
+))]
 fn all_versions(#[case] version_info: UnrealVersionInfo) {}
