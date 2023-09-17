@@ -262,11 +262,15 @@ pub struct AssetHeader<R> {
     pub package_flags: u32, // TODO: Use PackageFlags enum
     /// Table of names used by this asset (C++ name: `NameCount` and `NameOffset`)
     pub names: Vec<String>,
+    /// Number of soft object paths references contained in this package (C++ name: `SoftObjectPathsCount`)
+    pub soft_object_paths_count: i32,
+    /// Location into the file on disk for the soft object paths reference list (C++ name: `SoftObjectPathsOffset`)
+    pub soft_object_paths_offset: i32,
     /// Localization ID for this package (C++ name: `LocalizationId`)
     pub localization_id: Option<String>,
     /// Number of gatherable text data entries (C++ name: `GatherableTextDataCount`)
     pub gatherable_text_data_count: i32,
-    /// Location on disk of gatherable text data entries (C++ name: GatherableTextDataOffset``)
+    /// Location on disk of gatherable text data entries (C++ name: `GatherableTextDataOffset`)
     pub gatherable_text_data_offset: i32,
     /// Number of ExportMap entries (C++ name: `ExportCount`)
     pub export_count: i32,
@@ -338,6 +342,15 @@ where
             UnrealArray::<UnrealNameEntryWithHash>::parse_indirect(&mut archive)?
         } else {
             UnrealArray::<UnrealString>::parse_indirect(&mut archive)?
+        };
+
+        // This is an indirect array of `FSoftObjectPath` entries, which we could parse.
+        let has_soft_object_paths =
+            archive.serialized_with(ObjectVersionUE5::ADD_SOFTOBJECTPATH_LIST);
+        let (soft_object_paths_count, soft_object_paths_offset) = if has_soft_object_paths {
+            (archive.read_le()?, archive.read_le()?)
+        } else {
+            (0, 0)
         };
 
         let supports_localization_id =
@@ -456,6 +469,8 @@ where
             folder_name,
             package_flags,
             names,
+            soft_object_paths_count,
+            soft_object_paths_offset,
             localization_id,
             gatherable_text_data_count,
             gatherable_text_data_offset,
