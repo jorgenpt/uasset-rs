@@ -17,14 +17,19 @@ version (at time of writing, that is 4.26).
 
 You can find details on how to use it in your project in [the documentation on docs.rs][docs-rs].
 
+## Development
+
+Whenever there's a new Unreal version released, uasset-rs most likely needs to be updated to support the new version. If you're interested in contributing, you can see
+[UNREAL_UPGRADES.md](UNREAL_UPGRADES.md) for a quick overview of what that process looks like for me.
+
 ## License
 
 `uasset-rs` is licensed under either of
 
- * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0
+  ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license
+  ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
