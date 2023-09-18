@@ -16,7 +16,7 @@ exclude = ["/assets/", "/.github/", "/.vscode/", ".gitignore"]
 binread = "2.1.1"
 bit_field = "0.10.1"
 num-traits = "0.2"
-num-derive = "0.3"
+num-derive = "0.4"
 thiserror = "^1"
 
 # Optional dependencies for comandline-tool feature
