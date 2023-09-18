@@ -1,4 +1,4 @@
-use binread::BinReaderExt;
+use binread::{BinRead, BinReaderExt};
 use bit_field::BitField;
 use std::{
     io::{Read, Seek, SeekFrom},
@@ -16,6 +16,43 @@ use crate::{
     AssetHeader, Error, NameReference, ObjectImport, ObjectVersion, ObjectVersionUE5, Result,
     ThumbnailInfo,
 };
+
+impl<T> Deferrable for T
+where
+    T: BinRead,
+{
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl<T> Skippable for T
+where
+    T: BinRead + Sized,
+{
+    fn seek_past_with_info<R>(reader: &mut R, stream_info: &Self::StreamInfoType) -> Result<()>
+    where
+        R: Seek + Read,
+    {
+        reader.seek(SeekFrom::Start(stream_info.offset + size_of::<T>() as u64))?;
+        Ok(())
+    }
+}
+
+impl<T> Parseable for T
+where
+    T: BinRead,
+{
+    type ParsedType = T;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek + Read,
+    {
+        Ok(reader.read_le()?)
+    }
+}
 
 fn skip_string<R>(reader: &mut R) -> Result<()>
 where
