@@ -40,6 +40,6 @@ for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
 [unrealengine]: https://github.com/EpicGames/UnrealEngine/
-[packagefilesummary-h]: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Source/Runtime/CoreUObject/Public/UObject/PackageFileSummary.h
-[packagefilesummary-cpp]: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Source/Runtime/CoreUObject/Private/UObject/PackageFileSummary.cpp
+[packagefilesummary-h]: https://github.com/EpicGames/UnrealEngine/blob/ue5-main/Engine/Source/Runtime/CoreUObject/Public/UObject/PackageFileSummary.h
+[packagefilesummary-cpp]: https://github.com/EpicGames/UnrealEngine/blob/ue5-main/Engine/Source/Runtime/CoreUObject/Private/UObject/PackageFileSummary.cpp
 [docs-rs]: https://docs.rs/uasset

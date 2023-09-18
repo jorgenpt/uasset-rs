@@ -16,7 +16,7 @@ The immediate failure is this:
 .\assets\UE51\DirectCycle\DirectCycleA.uasset: Could not parse asset: failed to parse .\assets\UE51\DirectCycle\DirectCycleA.uasset: UnsupportedUE5Version(1008)
 ```
 
-This means that `EUnrealEngineObjectUE5Version` from `Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h` has a new value, 1008! If you open up [ObjectVersion.h](https://github.com/EpicGames/UnrealEngine/blob/5.1/Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h#L39) from the 5.1 branch, you'll see that there are two new entries that I then add to [ObjectVersionUE5](https://github.com/jorgenpt/uasset-rs/blob/main/src/enums.rs#L330).
+This means that `EUnrealEngineObjectUE5Version` from `Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h` has a new value, 1008! If you open up [ObjectVersion.h](https://github.com/EpicGames/UnrealEngine/blob/5.1/Engine/Source/Runtime/Core/Public/UObject/ObjectVersion.h#L39) from the 5.1 branch, you'll see that there are two new entries that I then add to [ObjectVersionUE5](https://github.com/jorgenpt/uasset-rs/blob/e7f401753992c403e4af76e6ef1fcd70f12c7562/src/enums.rs#L330).
 
 The next step is to add tests that automatically try to load the newly added assets. I go to [the test_utilities](https://github.com/jorgenpt/uasset-rs/blob/main/test_utilities/src/lib.rs) and [add a new test case for 5.1](https://github.com/jorgenpt/uasset-rs/commit/beda5a1294133a82a86fc8eca36265315d888eef#diff-db822ca26e41e0762e8bdc9eeb054a90a40abaf8937a3d3d98f577f5b83c4956R148) with the expected `ObjectVersionUE5::ADD_SOFTOBJECTPATH_LIST` version. A quick `cargo test` will reveal these tests as failing, because the new object version requires appropriate migration code.
 
