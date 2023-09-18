@@ -1,7 +1,7 @@
 use std::fs::File;
 
+use ::rstest_reuse::*;
 use rstest::rstest;
-use rstest_reuse::{self, *};
 use test_utilities::*;
 
 use uasset::AssetHeader;
