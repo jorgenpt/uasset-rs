@@ -303,6 +303,20 @@ pub struct AssetHeader<R> {
     pub texture_allocations: Option<i32>,
     /// Location on disk of the asset registry tag data (C++ name: `AssetRegistryDataOffset`)
     pub asset_registry_data_offset: i32,
+    /// Offset to the location in the file where the bulkdata starts  (C++ name: `BulkDataStartOffset`)
+    pub bulk_data_start_offset: i64,
+    /// Offset to the location in the file where the FWorldTileInfo data starts (C++ name: `WorldTileInfoDataOffset`)
+    pub world_tile_info_data_offset: Option<i32>,
+    /// Streaming install ChunkIDs (C++ name: `ChunkIDs`)
+    pub chunk_ids: Vec<i32>,
+    /// Number of preload dependency data entries (C++ name: `PreloadDependencyCount`)
+    pub preload_dependency_count: i32,
+    /// Location into the file on disk for the preload dependency data (C++ name: `PreloadDependencyOffset`)
+    pub preload_dependency_offset: i32,
+    /// Number of names that are referenced from serialized export data (sorted first in the name map) (C++ name: NamesReferencedFromExportDataCount`)
+    pub names_referenced_from_export_data_count: i32,
+    /// Location into the file on disk for the payload table of contents data (C++ name: `PayloadTocOffset`)
+    pub payload_toc_offset: i64,
 }
 
 impl<R> AssetHeader<R>
@@ -462,6 +476,62 @@ where
         };
 
         let asset_registry_data_offset = archive.read_le()?;
+        let bulk_data_start_offset = archive.read_le()?;
+
+        let has_world_tile_info_data =
+            archive.serialized_with(ObjectVersion::VER_UE4_WORLD_LEVEL_INFO);
+        let world_tile_info_data_offset = if has_world_tile_info_data {
+            let offset = archive.read_le()?;
+            if offset > 0 {
+                Some(offset)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let has_chunkid =
+            archive.serialized_with(ObjectVersion::VER_UE4_ADDED_CHUNKID_TO_ASSETDATA_AND_UPACKAGE);
+        let has_chunkid_array = has_chunkid
+            && archive
+                .serialized_with(ObjectVersion::VER_UE4_CHANGED_CHUNKID_TO_BE_AN_ARRAY_OF_CHUNKIDS);
+
+        let chunk_ids = if has_chunkid_array {
+            UnrealArray::<i32>::parse_inline(&mut archive)?
+        } else if has_chunkid {
+            let chunk_id = archive.read_le()?;
+            if chunk_id >= 0 {
+                vec![chunk_id]
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let has_preload_dependencies =
+            archive.serialized_with(ObjectVersion::VER_UE4_PRELOAD_DEPENDENCIES_IN_COOKED_EXPORTS);
+        let (preload_dependency_count, preload_dependency_offset) = if has_preload_dependencies {
+            (archive.read_le()?, archive.read_le()?)
+        } else {
+            (-1, 0)
+        };
+
+        let has_names_referenced_from_export_data =
+            archive.serialized_with(ObjectVersionUE5::NAMES_REFERENCED_FROM_EXPORT_DATA);
+        let names_referenced_from_export_data_count = if has_names_referenced_from_export_data {
+            archive.read_le()?
+        } else {
+            names.len() as i32
+        };
+
+        let has_payload_toc = archive.serialized_with(ObjectVersionUE5::PAYLOAD_TOC);
+        let payload_toc_offset = if has_payload_toc {
+            archive.read_le()?
+        } else {
+            -1
+        };
 
         Ok(Self {
             archive,
@@ -489,6 +559,13 @@ where
             additional_packages_to_cook,
             texture_allocations,
             asset_registry_data_offset,
+            bulk_data_start_offset,
+            world_tile_info_data_offset,
+            chunk_ids,
+            preload_dependency_count,
+            preload_dependency_offset,
+            names_referenced_from_export_data_count,
+            payload_toc_offset,
         })
     }
 }
