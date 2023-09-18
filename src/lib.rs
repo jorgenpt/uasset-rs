@@ -317,6 +317,8 @@ pub struct AssetHeader<R> {
     pub names_referenced_from_export_data_count: i32,
     /// Location into the file on disk for the payload table of contents data (C++ name: `PayloadTocOffset`)
     pub payload_toc_offset: i64,
+    /// Location into the file of the data resource(s) (C++ name: `DataResourceOffset `)
+    pub data_resource_offset: Option<i32>,
 }
 
 impl<R> AssetHeader<R>
@@ -533,6 +535,18 @@ where
             -1
         };
 
+        let has_data_resource_offset = archive.serialized_with(ObjectVersionUE5::DATA_RESOURCES);
+        let data_resource_offset = if has_data_resource_offset {
+            let offset = archive.read_le()?;
+            if offset > 0 {
+                Some(offset)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             archive,
             total_header_size,
@@ -566,6 +580,7 @@ where
             preload_dependency_offset,
             names_referenced_from_export_data_count,
             payload_toc_offset,
+            data_resource_offset,
         })
     }
 }

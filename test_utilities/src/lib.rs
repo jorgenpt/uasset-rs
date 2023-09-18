@@ -149,4 +149,12 @@ impl UnrealVersion {
     1,
     test_utilities::ObjectVersionUE5::ADD_SOFTOBJECTPATH_LIST
 ))]
+#[case::ue_5_2(test_utilities::UnrealVersionInfo::ue5(
+    2,
+    test_utilities::ObjectVersionUE5::DATA_RESOURCES
+))]
+#[case::ue_5_3(test_utilities::UnrealVersionInfo::ue5(
+    3,
+    test_utilities::ObjectVersionUE5::DATA_RESOURCES
+))]
 fn all_versions(#[case] version_info: UnrealVersionInfo) {}
