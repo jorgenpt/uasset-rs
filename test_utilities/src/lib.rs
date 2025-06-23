@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub use uasset::{ObjectVersion, ObjectVersionUE5};
 
 const LATEST_UE4_MINOR_VERSION: u32 = 27;
-const LATEST_UE5_MINOR_VERSION: u32 = 3;
+const LATEST_UE5_MINOR_VERSION: u32 = 4;
 
 pub struct UnrealVersion(pub u32, pub u32);
 pub struct UnrealVersionInfo {
@@ -160,5 +160,9 @@ impl UnrealVersion {
 #[case::ue_5_3(test_utilities::UnrealVersionInfo::ue5(
     3,
     test_utilities::ObjectVersionUE5::DATA_RESOURCES
+))]
+#[case::ue_5_4(test_utilities::UnrealVersionInfo::ue5(
+    4,
+    test_utilities::ObjectVersionUE5::PROPERTY_TAG_COMPLETE_TYPE_NAME
 ))]
 fn all_versions(#[case] version_info: UnrealVersionInfo) {}
