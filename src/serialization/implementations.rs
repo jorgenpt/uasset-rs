@@ -7,15 +7,10 @@ use std::{
     num::NonZeroU32,
 };
 
-use crate::{
-    archive::{SerializedFlags, SerializedObjectVersion},
-    serialization::{
-        ArrayStreamInfo, Deferrable, Parseable, ReadInfo, SingleItemStreamInfo, Skippable,
-        StreamInfo,
-    },
-    AssetHeader, Error, NameReference, ObjectImport, ObjectVersion, ObjectVersionUE5, Result,
-    ThumbnailInfo,
-};
+use crate::{archive::{SerializedFlags, SerializedObjectVersion}, serialization::{
+    ArrayStreamInfo, Deferrable, Parseable, ReadInfo, SingleItemStreamInfo, Skippable,
+    StreamInfo,
+}, AssetHeader, Error, NameReference, ObjectExport, ObjectImport, ObjectVersion, ObjectVersionUE5, Result, ThumbnailInfo};
 
 impl<T> Deferrable for T
 where
@@ -500,6 +495,111 @@ impl Parseable for UnrealNameReference {
 }
 
 #[derive(Debug)]
+pub struct UnrealObjectExport {}
+
+impl Deferrable for UnrealObjectExport {
+    type StreamInfoType = SingleItemStreamInfo;
+}
+
+impl Parseable for UnrealObjectExport {
+    type ParsedType = ObjectExport;
+
+    fn parse_with_info_seekless<R>(
+        reader: &mut R,
+        _read_info: &<Self::StreamInfoType as StreamInfo>::ReadInfoType,
+    ) -> Result<Self::ParsedType>
+    where
+        R: Seek
+        + Read
+        + SerializedObjectVersion<ObjectVersion>
+        + SerializedObjectVersion<ObjectVersionUE5>
+        + SerializedFlags,
+    {
+        let class_index = reader.read_le()?;
+        let super_index = reader.read_le()?;
+
+        let template_index = if reader.serialized_with(ObjectVersion::VER_UE4_TemplateIndex_IN_COOKED_EXPORTS) {
+            reader.read_le()?
+        } else { 0 };
+
+        let outer_index = reader.read_le()?;
+        let object_name = UnrealNameReference::parse_inline(reader)?;
+        let object_flags = reader.read_le()?;
+
+        let (serial_size, serial_offset) = if reader.serialized_with(ObjectVersion::VER_UE4_64BIT_EXPORTMAP_SERIALSIZES) {
+            (reader.read_le()?, reader.read_le()?)
+        } else { (reader.read_le::<i32>()? as i64, reader.read_le::<i32>()? as i64) };
+
+        let forced_export = reader.read_le::<u32>()? != 0;
+        let not_for_client = reader.read_le::<u32>()? != 0;
+        let not_for_server = reader.read_le::<u32>()? != 0;
+
+        if !reader.serialized_with(ObjectVersionUE5::REMOVE_OBJECT_EXPORT_PACKAGE_GUID) {
+            let _package_guid = UnrealGuid::seek_past(reader)?;
+        }
+
+        let is_inherited_instance = reader.read_le::<u32>()? != 0;
+
+        let package_flags = reader.read_le()?;
+
+        let not_always_loaded_for_editor_game = if reader.serialized_with(ObjectVersion::VER_UE4_LOAD_FOR_EDITOR_GAME)
+        {
+            reader.read_le::<u32>()? != 0
+        } else { true };
+
+
+        let is_asset = if reader.serialized_with(ObjectVersion::VER_UE4_COOKED_ASSETS_IN_EDITOR_SUPPORT)
+        {
+            reader.read_le::<u32>()? != 0
+        } else { false };
+
+        let generate_public_hash = if reader.serialized_with(ObjectVersionUE5::OPTIONAL_RESOURCES)
+        {
+            reader.read_le::<u32>()? != 0
+        } else { false };
+
+        let (first_export_dependency,
+            serialization_before_serialization_dependencies,
+            create_before_serialization_dependencies,
+            serialization_before_create_dependencies,
+            create_before_create_dependencies) = if reader.serialized_with(ObjectVersion::VER_UE4_PRELOAD_DEPENDENCIES_IN_COOKED_EXPORTS)
+        {
+            (reader.read_le()?, reader.read_le()?, reader.read_le()?, reader.read_le()?, reader.read_le()?)
+        } else { (-1, -1, -1, -1, -1) };
+
+        let (script_serialization_start_offset, script_serialization_end_offset) = if reader.serialized_with(ObjectVersionUE5::SCRIPT_SERIALIZATION_OFFSET) {
+            (reader.read_le()?, reader.read_le()?)
+        } else { (0, 0) };
+
+        Ok(Self::ParsedType {
+            outer_index,
+            object_name,
+            class_index,
+            super_index,
+            template_index,
+            object_flags,
+            serial_size,
+            serial_offset,
+            script_serialization_start_offset,
+            script_serialization_end_offset,
+            forced_export,
+            not_for_client,
+            not_for_server,
+            not_always_loaded_for_editor_game,
+            is_asset,
+            is_inherited_instance,
+            generate_public_hash,
+            package_flags,
+            first_export_dependency,
+            serialization_before_serialization_dependencies,
+            create_before_serialization_dependencies,
+            serialization_before_create_dependencies,
+            create_before_create_dependencies,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct UnrealClassImport {}
 
 impl Deferrable for UnrealClassImport {
@@ -540,10 +640,10 @@ impl Parseable for UnrealClassImport {
         };
 
         Ok(Self::ParsedType {
-            class_package,
-            class_name,
             outer_index,
             object_name,
+            class_package,
+            class_name,
             package_name,
             import_optional,
         })

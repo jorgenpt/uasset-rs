@@ -127,6 +127,7 @@ use std::{
 pub use archive::{Archive, CustomVersionSerializationFormat};
 pub use enums::{ObjectVersion, ObjectVersionUE5, PackageFlags};
 pub use error::{Error, InvalidNameIndexError, Result};
+use crate::serialization::UnrealObjectExport;
 
 /// A reference to a name in the [`AssetHeader::names`] name table. You can use [`AssetHeader::resolve_name`] to get a human-readable
 /// string from a `NameReference`. It only makes sense to compare `NameReference`s from the same `AssetHeader`.
@@ -141,24 +142,113 @@ pub struct NameReference {
 
 /// A reference to either an import or an export in the asset.
 #[derive(Debug)]
-pub enum ObjectImportOuter {
-    Root,
+pub enum ObjectReference {
+    None,
     Export { export_index: u32 },
     Import { import_index: u32 },
+}
+
+impl From<i32> for ObjectReference {
+    fn from(index: i32) -> Self {
+        match index.cmp(&0) {
+            Ordering::Equal => ObjectReference::None,
+            Ordering::Greater => ObjectReference::Export {
+                export_index: (index - 1) as u32,
+            },
+            Ordering::Less => ObjectReference::Import {
+                import_index: -(index + 1) as u32,
+            },
+        }
+    }
+}
+
+/// A reference to an object in another package. Typically accessed through [`AssetHeader::package_import_iter`], but you can also
+/// manually resolve the [`NameReference`]s. (C++ name: `FObjectImport`)
+#[derive(Debug)]
+pub struct ObjectExport {
+    /// Location of the Outer of this object. (C++ name: `OuterIndex`)
+    outer_index: i32,
+    /// The name of the object we are importing. (C++ name: `ObjectName`)
+    pub object_name: NameReference,
+
+    /// If this is not a class, an ObjectReference for the class of this export
+    class_index: i32,
+
+    /// If this is a class or a struct, an ObjectReference for the superclass of this export
+    super_index: i32,
+
+    template_index: i32,
+
+    /// Object flags for this export
+    pub object_flags: u32, // TODO: Use ObjectFlags enum
+
+    /// Number of bytes serialized by this export
+    pub serial_size: i64,
+
+    /// Offset of the start of the bytes for this export
+    pub serial_offset: i64,
+
+    /// Relative to serial_offset, beginning of this export's tagged property serialization data
+    pub script_serialization_start_offset: i64,
+
+    /// Relative to serial_offset, end of the tagged property serialization data
+    pub script_serialization_end_offset: i64,
+
+    pub forced_export: bool,
+    pub not_for_client: bool,
+    pub not_for_server: bool,
+
+    /// False if the object is *always* loaded in the editor game (true means maybe)
+    pub not_always_loaded_for_editor_game: bool,
+
+    pub is_asset: bool,
+    pub is_inherited_instance: bool,
+    pub generate_public_hash: bool,
+
+    /// If this is a top level package, the original package file flags
+    pub package_flags: u32, // TODO: Use PackageFlags enum
+
+    // Contiguous blocks with offsets relative to each other, -1 means "not present"
+    pub first_export_dependency: i32,
+    pub serialization_before_serialization_dependencies: i32,
+    pub create_before_serialization_dependencies: i32,
+    pub serialization_before_create_dependencies: i32,
+    pub create_before_create_dependencies: i32,
+}
+
+impl ObjectExport {
+    /// Determine where the Outer for this export lives
+    pub fn outer(&self) -> ObjectReference {
+        ObjectReference::from(self.outer_index)
+    }
+
+    /// Determine where the Class for this export lives, if it's not a class export
+    pub fn class(&self) -> ObjectReference {
+        ObjectReference::from(self.class_index)
+    }
+
+    /// Determine where the Super for this export lives, if it's a class export
+    pub fn superclass(&self) -> ObjectReference {
+        ObjectReference::from(self.super_index)
+    }
+
+    pub fn template(&self) -> ObjectReference {
+        ObjectReference::from(self.template_index)
+    }
 }
 
 /// A reference to an object in another package. Typically accessed through [`AssetHeader::package_import_iter`], but you can also
 /// manually resolve the [`NameReference`]s. (C++ name: `FObjectImport`)
 #[derive(Debug)]
 pub struct ObjectImport {
-    /// The name of the package that contains the class of the object we're importing. (C++ name: `ClassPackage`)
-    pub class_package: NameReference,
-    /// The name of the class of the object we're importing. (C++ name: `ClassName`)
-    pub class_name: NameReference,
     /// Location of the Outer of this object. (C++ name: `OuterIndex`)
     outer_index: i32,
     /// The name of the object we are importing. (C++ name: `ObjectName`)
     pub object_name: NameReference,
+    /// The name of the package that contains the class of the object we're importing. (C++ name: `ClassPackage`)
+    pub class_package: NameReference,
+    /// The name of the class of the object we're importing. (C++ name: `ClassName`)
+    pub class_name: NameReference,
     /// Package name this import belongs to (C++ name: `PackageName`)
     pub package_name: Option<NameReference>,
     /// Does this import come from an optional package (C++ name: `bImportOptional`)
@@ -167,16 +257,8 @@ pub struct ObjectImport {
 
 impl ObjectImport {
     /// Determine where the Outer for this import lives
-    pub fn outer(&self) -> ObjectImportOuter {
-        match self.outer_index.cmp(&0) {
-            Ordering::Equal => ObjectImportOuter::Root,
-            Ordering::Greater => ObjectImportOuter::Export {
-                export_index: (self.outer_index - 1) as u32,
-            },
-            Ordering::Less => ObjectImportOuter::Import {
-                import_index: -(self.outer_index + 1) as u32,
-            },
-        }
+    pub fn outer(&self) -> ObjectReference {
+        ObjectReference::from(self.outer_index)
     }
 }
 
@@ -272,10 +354,8 @@ pub struct AssetHeader<R> {
     pub gatherable_text_data_count: i32,
     /// Location on disk of gatherable text data entries (C++ name: `GatherableTextDataOffset`)
     pub gatherable_text_data_offset: i32,
-    /// Number of ExportMap entries (C++ name: `ExportCount`)
-    pub export_count: i32,
-    /// Location on disk of the ExportMap data (C++ name: `ExportOffset`)
-    pub export_offset: i32,
+    /// Exports (objects) listed by this asset (C++ name: `ExportCount` and `ExportOffset`)
+    pub exports: Vec<ObjectExport>,
     /// Imports (dependencies) listed by this asset (C++ name: `ImportCount` and `ImportOffset`)
     pub imports: Vec<ObjectImport>,
     /// Location of DependsMap data (C++ name: `DependsOffset`)
@@ -386,8 +466,7 @@ where
             (0, 0)
         };
 
-        let export_count = archive.read_le()?;
-        let export_offset = archive.read_le()?;
+        let exports = UnrealArray::<UnrealObjectExport>::parse_indirect(&mut archive)?;
 
         let imports = UnrealArray::<UnrealClassImport>::parse_indirect(&mut archive)?;
 
@@ -558,8 +637,7 @@ where
             localization_id,
             gatherable_text_data_count,
             gatherable_text_data_offset,
-            export_count,
-            export_offset,
+            exports,
             imports,
             depends_offset,
             soft_package_references_count,
