@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub use uasset::{ObjectVersion, ObjectVersionUE5};
 
 const LATEST_UE4_MINOR_VERSION: u32 = 27;
-const LATEST_UE5_MINOR_VERSION: u32 = 0;
+const LATEST_UE5_MINOR_VERSION: u32 = 3;
 
 pub struct UnrealVersion(pub u32, pub u32);
 pub struct UnrealVersionInfo {
@@ -29,6 +29,10 @@ impl UnrealVersionInfo {
     }
 
     pub fn ue5(minor_version: u32, object_version_ue5: ObjectVersionUE5) -> Self {
+        if minor_version > LATEST_UE5_MINOR_VERSION {
+            panic!("Received UE5 version 5.{minor_version}, but LATEST_UE5_MINOR_VERSION is {LATEST_UE5_MINOR_VERSION}")
+        }
+
         Self {
             version: UnrealVersion(5, minor_version),
             next_version: if minor_version < LATEST_UE5_MINOR_VERSION {
