@@ -538,7 +538,11 @@ impl Parseable for UnrealObjectExport {
             let _package_guid = UnrealGuid::seek_past(reader)?;
         }
 
-        let is_inherited_instance = reader.read_le::<u32>()? != 0;
+        let is_inherited_instance = if reader.serialized_with(ObjectVersionUE5::TRACK_OBJECT_EXPORT_IS_INHERITED) {
+            reader.read_le::<u32>()? != 0
+        } else {
+            false
+        };
 
         let package_flags = reader.read_le()?;
 
