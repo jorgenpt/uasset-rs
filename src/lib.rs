@@ -105,7 +105,7 @@
 )]
 
 mod archive;
-mod enums;
+pub mod enums;
 mod error;
 mod serialization;
 

@@ -12,8 +12,9 @@ use std::{
 use structopt::StructOpt;
 use structopt_flags::LogLevel;
 use tempfile::TempDir;
-use uasset::AssetHeader;
+use uasset::{AssetHeader, ObjectReference};
 use walkdir::WalkDir;
+use uasset::enums::ObjectFlags;
 
 const UASSET_EXTENSIONS: [&str; 2] = ["uasset", "umap"];
 
@@ -115,6 +116,11 @@ enum Command {
         /// Skip showing imports for code references (imports that start with /Script/)
         #[structopt(long)]
         skip_code_imports: bool,
+    },
+    /// Show the object types of the public exports of the listed assets
+    ListObjectTypes {
+        /// Assets to list object types for, directories will be recursively searched for assets
+        assets_or_directories: Vec<PathBuf>,
     },
     /// Dump some information about the thumbnails for the listed assets
     DumpThumbnailInfo {
@@ -454,6 +460,40 @@ fn main() -> Result<()> {
                     }
                 });
             }
+        }
+        Command::ListObjectTypes {
+            assets_or_directories,
+        } => {
+            let checked_flags = ObjectFlags::Standalone as u32 | ObjectFlags::Public as u32 | ObjectFlags::Transient as u32 | ObjectFlags::ClassDefaultObject as u32;
+            let expected_flags = ObjectFlags::Standalone as u32 | ObjectFlags::Public as u32;
+            let asset_paths = recursively_walk_uassets(assets_or_directories);
+            println!("{{");
+            for asset_path in asset_paths {
+                try_parse_or_log(&asset_path, |header| {
+                    let expected_object_name_start_index = header.package_name.rfind('/').map(|i| i + 1).unwrap_or_default();
+                    let expected_object_name = header.package_name[expected_object_name_start_index..].to_string();
+                    let expected_object_name_index = header.find_name(&expected_object_name);
+
+                    let asset_object = header.exports.iter().find(|export| Some(export.object_name) == expected_object_name_index && export.is_asset && export.object_flags & checked_flags == expected_flags);
+                    let asset_type = asset_object.and_then(|asset_object| {
+                        let class_name = match asset_object.class() {
+                            ObjectReference::Export { export_index } => header.exports.get(export_index).map(|e| e.object_name),
+                            ObjectReference::Import { import_index } => header.imports.get(import_index).map(|e| e.object_name),
+                            ObjectReference::None => None,
+                        };
+
+                        class_name.and_then(|name| header.resolve_name(&name).map(|s| s.to_string()).ok())
+                    });
+                    if let Some(asset_type) = asset_type {
+                        println!("\t\"{asset_path}\": \"{asset_type}\",", asset_path = asset_path.display());
+                    } else {
+                        println!("\t\"{asset_path}\": null,", asset_path = asset_path.display());
+                    }
+                });
+            }
+            // Just to avoid having to deal with managing trailing commas in JSON.
+            println!("\t\"__sentinel\": null");
+            println!("}}");
         }
         Command::DumpThumbnailInfo {
             assets_or_directories,

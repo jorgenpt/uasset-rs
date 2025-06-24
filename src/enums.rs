@@ -390,7 +390,6 @@ pub enum PackageFlags {
 }
 
 /// Maps to `EObjectFlags` in Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectMacros.h.
-#[allow(dead_code)]
 #[derive(Debug)]
 #[repr(u32)]
 pub enum ObjectFlags {
