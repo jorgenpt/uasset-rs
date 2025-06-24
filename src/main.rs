@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
     time,
 };
+use std::collections::HashMap;
 use structopt::StructOpt;
 use structopt_flags::LogLevel;
 use tempfile::TempDir;
@@ -463,7 +464,7 @@ fn main() -> Result<()> {
             let checked_flags = ObjectFlags::Standalone as u32 | ObjectFlags::Public as u32 | ObjectFlags::Transient as u32 | ObjectFlags::ClassDefaultObject as u32;
             let expected_flags = ObjectFlags::Standalone as u32 | ObjectFlags::Public as u32;
             let asset_paths = recursively_walk_uassets(assets_or_directories);
-            println!("{{");
+            let mut asset_types = HashMap::new();
             for asset_path in asset_paths {
                 try_parse_or_log(&asset_path, |header| {
                     let expected_object_name_start_index = header.package_name.rfind('/').map(|i| i + 1).unwrap_or_default();
@@ -480,16 +481,11 @@ fn main() -> Result<()> {
 
                         class_name.and_then(|name| header.resolve_name(&name).map(|s| s.to_string()).ok())
                     });
-                    if let Some(asset_type) = asset_type {
-                        println!("\t\"{asset_path}\": \"{asset_type}\",", asset_path = asset_path.display());
-                    } else {
-                        println!("\t\"{asset_path}\": null,", asset_path = asset_path.display());
-                    }
+
+                    asset_types.insert(asset_path.display().to_string(), asset_type);
                 });
             }
-            // Just to avoid having to deal with managing trailing commas in JSON.
-            println!("\t\"__sentinel\": null");
-            println!("}}");
+            println!("{json}", json = serde_json::to_string(&asset_types)?);
         }
         Command::DumpThumbnailInfo {
             assets_or_directories,
