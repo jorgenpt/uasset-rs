@@ -338,8 +338,8 @@ pub struct AssetHeader<R> {
     pub archive: Archive<R>,
     /// Full size of the asset header (C++ name: `TotalHeaderSize`)
     pub total_header_size: i32,
-    /// The "Generic Browser" folder name that it lives in (C++ name: `FolderName`)
-    pub folder_name: String,
+    /// The last name this package was saved with (C++ name: `PackageName`)
+    pub package_name: String,
     /// Package flags like whether this was serialized for the editor (C++ name: `PackagesFlags`)
     pub package_flags: u32, // TODO: Use PackageFlags enum
     /// Table of names used by this asset (C++ name: `NameCount` and `NameOffset`)
@@ -428,7 +428,7 @@ where
 
         let total_header_size = archive.read_le()?;
 
-        let folder_name = UnrealString::parse_inline(&mut archive)?;
+        let package_name = UnrealString::parse_inline(&mut archive)?;
 
         let package_flags = archive.read_le()?;
         let has_editor_only_data = (package_flags & PackageFlags::FilterEditorOnly as u32) == 0;
@@ -629,7 +629,7 @@ where
         Ok(Self {
             archive,
             total_header_size,
-            folder_name,
+            package_name,
             package_flags,
             names,
             soft_object_paths_count,
