@@ -59,6 +59,7 @@ fn parse_validation_mode(src: &str) -> Result<ValidationMode> {
         let modes = src.split(',');
         let mut parsed_modes = Vec::new();
         for mode in modes {
+            #[allow(clippy::unimplemented)]
             let parsed_mode = match mode {
                 "AssetReferencesExist" => unimplemented!("Validation::AssetReferencesExist"),
                 "HasEngineVersion" => Validation::HasEngineVersion,
@@ -89,7 +90,7 @@ enum Command {
         /// Assets to load, directories will be recursively searched for assets
         assets_or_directories: Vec<PathBuf>,
     },
-    /// Show all the fields of the AssetHeader for the listed assets
+    /// Show all the fields of the `AssetHeader` for the listed assets
     Dump {
         /// Assets to dump, directories will be recursively searched for assets
         assets_or_directories: Vec<PathBuf>,
@@ -104,8 +105,8 @@ enum Command {
         /// Validation mode, [All|Mode1,Mode2,..],
         ///
         /// Valid modes are:
-        ///  - AssetReferencesExist: Verify that all asset references to or from the listed assets are valid
-        ///  - HasEngineVersion: Verify that every asset has a valid engine version
+        ///  - `AssetReferencesExist`: Verify that all asset references to or from the listed assets are valid
+        ///  - `HasEngineVersion`: Verify that every asset has a valid engine version
         #[structopt(long, parse(try_from_str = parse_validation_mode), verbatim_doc_comment)]
         mode: Option<ValidationMode>,
     },
@@ -142,7 +143,7 @@ fn recursively_walk_uassets(paths: Vec<PathBuf>) -> Vec<PathBuf> {
                         entry
                             .file_name()
                             .to_str()
-                            .map_or(false, |name| !name.starts_with('.') && is_uasset(name))
+                            .is_some_and(|name| !name.starts_with('.') && is_uasset(name))
                     })
                     .filter(|entry| entry.file_type().is_file())
                     .map(|entry| entry.path().to_path_buf())
@@ -215,7 +216,7 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
     let command = std::process::Command::new("p4")
         .args(["-z", "tag", "-Mj"])
         .arg("files")
-        .arg(&format!("@={}", changelist))
+        .arg(format!("@={}", changelist))
         .output()?;
 
     let stdout = std::str::from_utf8(&command.stdout)?;
@@ -231,17 +232,12 @@ fn fetch_perforce_uassets(changelist: NonZeroU32) -> Result<(Option<TempDir>, Ve
     for line in stdout.lines() {
         let record: PerforceFilesRecord = serde_json::from_str(line)?;
         let modified_file = match record.action {
-            PerforceAction::Add => Some(&record.depot_file),
-            PerforceAction::Edit => Some(&record.depot_file),
-            PerforceAction::Branch => Some(&record.depot_file),
-            PerforceAction::MoveAdd => Some(&record.depot_file),
-            PerforceAction::Integrate => Some(&record.depot_file),
-            PerforceAction::Import => Some(&record.depot_file),
-            _ => None,
+            PerforceAction::Delete | PerforceAction::MoveDelete | PerforceAction::Purge | PerforceAction::Archive => None,
+            _ => Some(&record.depot_file),
         };
 
         if let Some(path) = modified_file {
-            if !is_uasset(&path) {
+            if !is_uasset(path) {
                 trace!("ignoring modified file {}, not an uasset", path);
                 continue;
             }
@@ -428,7 +424,7 @@ fn main() -> Result<()> {
             }
 
             if let Some(temp_dir) = temp_dir {
-                temp_dir.close()?
+                temp_dir.close()?;
             }
 
             if !errors.is_empty() {
@@ -438,7 +434,7 @@ fn main() -> Result<()> {
                     num_evaluated_assets
                 );
                 for error in errors {
-                    eprintln!("{}", error)
+                    eprintln!("{}", error);
                 }
                 bail!("Validation failed");
             } else {
