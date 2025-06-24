@@ -168,7 +168,7 @@ impl From<i32> for ObjectReference {
 pub struct ObjectExport {
     /// Location of the Outer of this object. (C++ name: `OuterIndex`)
     outer_index: i32,
-    /// The name of the object we are importing. (C++ name: `ObjectName`)
+    /// The name of the object we are exporting. (C++ name: `ObjectName`)
     pub object_name: NameReference,
 
     /// If this is not a class, an ObjectReference for the class of this export
