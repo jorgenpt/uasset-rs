@@ -144,8 +144,8 @@ pub struct NameReference {
 #[derive(Debug)]
 pub enum ObjectReference {
     None,
-    Export { export_index: u32 },
-    Import { import_index: u32 },
+    Export { export_index: usize },
+    Import { import_index: usize },
 }
 
 impl From<i32> for ObjectReference {
@@ -153,10 +153,10 @@ impl From<i32> for ObjectReference {
         match index.cmp(&0) {
             Ordering::Equal => ObjectReference::None,
             Ordering::Greater => ObjectReference::Export {
-                export_index: (index - 1) as u32,
+                export_index: (index - 1) as usize,
             },
             Ordering::Less => ObjectReference::Import {
-                import_index: -(index + 1) as u32,
+                import_index: -(index + 1) as usize,
             },
         }
     }
