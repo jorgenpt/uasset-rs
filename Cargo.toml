@@ -4,7 +4,7 @@ description = "Parsing of Unreal Engine asset files (uassets)"
 keywords = ["unreal", "ue4", "uasset"]
 categories = ["game-development", "parser-implementations"]
 authors = ["Jørgen P. Tjernø <jorgen@tjer.no>"]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/jorgenpt/uasset-rs/"
 repository = "https://github.com/jorgenpt/uasset-rs/"
@@ -17,7 +17,7 @@ binread = "2.1.1"
 bit_field = "0.10.1"
 num-traits = "0.2"
 num-derive = "0.4"
-thiserror = "^1"
+thiserror = "2.0.12"
 
 # Optional dependencies for comandline-tool feature
 anyhow = { version = "^1", optional = true }
@@ -31,8 +31,8 @@ tempfile = { version = "3.3", optional = true }
 walkdir = { version = "2", optional = true }
 
 [dev-dependencies]
-rstest = "0.18.2"
-rstest_reuse = "0.6.0"
+rstest = "0.25.0"
+rstest_reuse = "0.7.0"
 test_utilities = { path = "test_utilities" }
 
 [features]
