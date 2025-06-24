@@ -7,4 +7,4 @@ edition = "2024"
 [dependencies]
 rstest = "0.25.0"
 rstest_reuse = "0.7.0"
-uasset = {path = "../"}
+uasset = {path = ".."}

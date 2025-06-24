@@ -109,8 +109,7 @@ where
             } else {
                 // Omit the trailing \0
                 let length = length - 1;
-                let mut utf8_bytes = Vec::new();
-                utf8_bytes.resize(length as usize, 0u8);
+                let mut utf8_bytes = vec![0u8; length as usize];
 
                 reader.read_exact(&mut utf8_bytes)?;
                 // Skip the trailing \0

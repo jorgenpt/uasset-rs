@@ -115,10 +115,10 @@ pub struct ObjectExport {
     /// The name of the object we are exporting. (C++ name: `ObjectName`)
     pub object_name: NameReference,
 
-    /// If this is not a class, an ObjectReference for the class of this export
+    /// If this is not a class, an `ObjectReference` for the class of this export
     class_index: i32,
 
-    /// If this is a class or a struct, an ObjectReference for the superclass of this export
+    /// If this is a class or a struct, an `ObjectReference` for the superclass of this export
     super_index: i32,
 
     template_index: i32,
@@ -132,10 +132,10 @@ pub struct ObjectExport {
     /// Offset of the start of the bytes for this export
     pub serial_offset: i64,
 
-    /// Relative to serial_offset, beginning of this export's tagged property serialization data
+    /// Relative to `serial_offset`, beginning of this export's tagged property serialization data
     pub script_serialization_start_offset: i64,
 
-    /// Relative to serial_offset, end of the tagged property serialization data
+    /// Relative to `serial_offset`, end of the tagged property serialization data
     pub script_serialization_end_offset: i64,
 
     pub forced_export: bool,
@@ -251,7 +251,7 @@ impl<'a, R> Iterator for ImportIterator<'a, R> {
             if import.class_name == self.package_name_reference
                 && self
                     .core_uobject_package_name_reference
-                    .map_or(false, |n| import.object_name != n)
+                    .is_some_and(|n| import.object_name != n)
             {
                 return Some(
                     self.package
@@ -302,13 +302,13 @@ pub struct AssetHeader<R> {
     pub exports: Vec<ObjectExport>,
     /// Imports (dependencies) listed by this asset (C++ name: `ImportCount` and `ImportOffset`)
     pub imports: Vec<ObjectImport>,
-    /// Location of DependsMap data (C++ name: `DependsOffset`)
+    /// Location of `DependsMap` data (C++ name: `DependsOffset`)
     pub depends_offset: i32,
     /// Number of soft package references that are listed (C++ name: `SoftPackageReferencesCount`)
     pub soft_package_references_count: i32,
     /// Location on disk of the soft package references (C++ name: `SoftPackageReferencesOffset`)
     pub soft_package_references_offset: i32,
-    /// Location of SearchableNamesMap data (C++ name: `SearchableNamesOffset`)
+    /// Location of `SearchableNamesMap` data (C++ name: `SearchableNamesOffset`)
     pub searchable_names_offset: Option<i32>,
     /// Offset of the thumbnail table (C++ name: `ThumbnailTableOffset`)
     pub thumbnail_table_offset: i32,
@@ -329,15 +329,15 @@ pub struct AssetHeader<R> {
     pub asset_registry_data_offset: i32,
     /// Offset to the location in the file where the bulkdata starts  (C++ name: `BulkDataStartOffset`)
     pub bulk_data_start_offset: i64,
-    /// Offset to the location in the file where the FWorldTileInfo data starts (C++ name: `WorldTileInfoDataOffset`)
+    /// Offset to the location in the file where the `FWorldTileInfo` data starts (C++ name: `WorldTileInfoDataOffset`)
     pub world_tile_info_data_offset: Option<i32>,
-    /// Streaming install ChunkIDs (C++ name: `ChunkIDs`)
+    /// Streaming install chunk ids (C++ name: `ChunkIDs`)
     pub chunk_ids: Vec<i32>,
     /// Number of preload dependency data entries (C++ name: `PreloadDependencyCount`)
     pub preload_dependency_count: i32,
     /// Location into the file on disk for the preload dependency data (C++ name: `PreloadDependencyOffset`)
     pub preload_dependency_offset: i32,
-    /// Number of names that are referenced from serialized export data (sorted first in the name map) (C++ name: NamesReferencedFromExportDataCount`)
+    /// Number of names that are referenced from serialized export data (sorted first in the name map) (C++ name: `NamesReferencedFromExportDataCount`)
     pub names_referenced_from_export_data_count: i32,
     /// Location into the file on disk for the payload table of contents data (C++ name: `PayloadTocOffset`)
     pub payload_toc_offset: i64,
@@ -626,10 +626,10 @@ impl<R> AssetHeader<R> {
     }
 
     /// Look up the string representation for a given [`NameReference`].
-    pub fn resolve_name<'a>(
-        &'a self,
+    pub fn resolve_name(
+        &self,
         name_reference: &NameReference,
-    ) -> std::result::Result<Cow<'a, str>, InvalidNameIndexError> {
+    ) -> std::result::Result<Cow<'_, str>, InvalidNameIndexError> {
         let index = name_reference.index as usize;
         if self.names.len() > index {
             let mut name = Cow::from(&self.names[index]);
